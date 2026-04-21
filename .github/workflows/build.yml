@@ -180,7 +180,7 @@ jobs:
 
       - name: Use multi-arch publish action
         id: publish
-        uses: gh-workflow/multiarch-image-publish@d06aea65496795017c947a8db534c92de6969793  # 0.1.7
+        uses: gh-workflow/multiarch-image-publish@7d06a2bfbe2212d853b1f1a1c8093f16817f70e7  # 0.1.10
         with:
           image_ref: ghcr.io/aicage/aicage-image-util
           tags: |
