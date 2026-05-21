@@ -6,19 +6,19 @@ name: GHCR Cleanup
     - cron: "41 3 * * 3"
   workflow_dispatch:
     inputs:
-      RETENTION_DAYS:
+      older-than-days:
         description: "Retention window in days for cleanup"
         type: number
         default: 30
-      RELEASE_TAG_KEEP_COUNT:
-        description: "How many latest release tags to keep"
+      keep-n-tagged:
+        description: "How many tags to keep"
         type: number
         default: 3
-      dry_run:
+      dry-run:
         description: "Run in dry-run mode (recommended first)"
         type: boolean
         default: true
-      log_level:
+      log-level:
         description: "Action log level"
         type: choice
         options:
@@ -31,8 +31,6 @@ name: GHCR Cleanup
 env:
   # Repo-specific high-level knobs
   PACKAGE_NAME: aicage-image-util
-  RETENTION_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.RETENTION_DAYS || 30 }}
-  RELEASE_TAG_KEEP_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.RELEASE_TAG_KEEP_COUNT || 3 }}
 
 permissions:
   contents: read
@@ -44,9 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       package_name: ${{ steps.config.outputs.package_name }}
-      retention_days: ${{ steps.config.outputs.retention_days }}
-      keep_tags_regex: ${{ steps.regex.outputs.keep_tags_regex }}
-      release_list: ${{ steps.regex.outputs.release_list }}
+      exclude_tags_regex: ${{ steps.regex.outputs.exclude_tags_regex }}
     steps:
       - name: Export config
         id: config
@@ -55,7 +51,6 @@ jobs:
           set -euo pipefail
           {
             echo "package_name=${PACKAGE_NAME}"
-            echo "retention_days=${RETENTION_DAYS}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Checkout
@@ -63,26 +58,19 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build release list and keep-regex
+      - name: Build exclude-tags-regex
         id: regex
         shell: bash
         run: |
           set -euo pipefail
 
-          N="${RELEASE_TAG_KEEP_COUNT}"
-          if ! [[ "${N}" =~ ^[0-9]+$ ]]; then
-            echo "RELEASE_TAG_KEEP_COUNT must be an integer, got: ${N}" >&2
-            exit 1
-          fi
-
           git fetch --tags --force
 
           # Repo-specific release source:
-          # last N tags by semantic version ordering.
-          mapfile -t TAGS < <(git tag -l --sort=-version:refname | head -n "${N}")
+          mapfile -t TAGS < <(git tag -l --sort=-version:refname)
 
           if (( ${#TAGS[@]} == 0 )); then
-            echo "No release tags found. RELEASE_LIST must be non-empty." >&2
+            echo "No release tags found. This must be non-empty." >&2
             exit 1
           fi
 
@@ -95,11 +83,10 @@ jobs:
           RELEASE_LIST="$(IFS='|'; echo "${ESCAPED_TAGS[*]}")"
 
           ARCH_SUFFIX='(-amd64|-arm64)?'
-          KEEP_TAGS_REGEX="^(agent-version|${RELEASE_LIST})${ARCH_SUFFIX}$"
+          EXCLUDE_TAGS_REGEX="^(agent-version|${RELEASE_LIST})${ARCH_SUFFIX}$"
 
           {
-            echo "release_list=${RELEASE_LIST}"
-            echo "keep_tags_regex=${KEEP_TAGS_REGEX}"
+            echo "exclude_tags_regex=${EXCLUDE_TAGS_REGEX}"
           } | tee /dev/stderr >> "${GITHUB_OUTPUT}"
 
   ghcr-cleanup:
@@ -119,8 +106,9 @@ jobs:
           upload-artifacts: true
           use-regex: true
           delete-tags: '.*'
-          exclude-tags: ${{ needs.prepare-retention-regex.outputs.keep_tags_regex }}
-          older-than: ${{ needs.prepare-retention-regex.outputs.retention_days }} days
+          keep-n-tagged: ${{ github.event_name == 'workflow_dispatch' && inputs.keep-n-tagged || 3 }}
+          exclude-tags: ${{ needs.prepare-retention-regex.outputs.exclude_tags_regex }}
+          older-than: ${{ github.event_name == 'workflow_dispatch' && inputs.older-than-days || 30 }} days
           delete-untagged: true
-          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
-          log-level: ${{ github.event_name == 'workflow_dispatch' && inputs.log_level || 'info' }}
+          dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}
+          log-level: ${{ github.event_name == 'workflow_dispatch' && inputs.log-level || 'info' }}
