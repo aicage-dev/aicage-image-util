@@ -129,6 +129,14 @@ jobs:
             org.opencontainers.image.created=${{ steps.oci.outputs.created }}
             org.opencontainers.image.version=${{ needs.resolve-ref.outputs.VERSION_TAG }}
 
+      - name: Remove test tag on image
+        uses: ghcr-manager/ghcr-untag-action@fc2493e7e9c5f53d0b438a4f8c80e5868fd6d1ea  # v1.0.1
+        with:
+          token: ${{ github.token }}
+          owner: aicage
+          package: aicage-image-util
+          tags: ${{ env.IMAGE_TEST_TAG }}
+
       - name: "Test: Verify OCI labels on util image"
         run: |
           set -euo pipefail
