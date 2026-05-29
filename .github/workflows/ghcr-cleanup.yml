@@ -95,8 +95,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Cleanup candidate images
-        uses: dataaxiom/ghcr-cleanup-action@374e2028c8fb93b7219f3771cd405fab95d3dec4  # v1.2.0
-        # uses: dataaxiom/ghcr-cleanup-action@374e2028c8fb93b7219f3771cd405fab95d3dec4  # main
+        uses: dataaxiom/ghcr-cleanup-action@f092b48ba3b604b2a83690dc4b2bbb3392e1045f  # v1.2.1
+        # uses: dataaxiom/ghcr-cleanup-action@f092b48ba3b604b2a83690dc4b2bbb3392e1045f  # main
         # uses: gh-workflow/ghcr-manager@d4b42011baf74f5f59f8b05198372c7ffd0e04b2  # 0.9.6
         with:
           # command: cleanup
