@@ -29,7 +29,7 @@ jobs:
       VERSION_TAG: ${{ steps.ref.outputs.VERSION_TAG }}
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
       - name: Resolve git ref
         id: ref
         run: |
@@ -86,7 +86,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10  # v6.0.3
         with:
           ref: ${{ needs.resolve-ref.outputs.GIT_REF }}
 
@@ -130,7 +130,7 @@ jobs:
             org.opencontainers.image.version=${{ needs.resolve-ref.outputs.VERSION_TAG }}
 
       - name: Remove test tag on image
-        uses: ghcr-manager/ghcr-untag-action@fc2493e7e9c5f53d0b438a4f8c80e5868fd6d1ea  # v1.0.1
+        uses: ghcr-manager/ghcr-untag-action@0c32d681a3f68580cbcfebfcf126cbab8df872f8  # v1.0.4
         with:
           token: ${{ github.token }}
           owner: aicage
