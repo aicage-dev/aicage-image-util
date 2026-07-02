@@ -94,13 +94,14 @@ jobs:
     needs: prepare-retention-regex
     runs-on: ubuntu-latest
     steps:
-      - name: Cleanup candidate images
-        uses: dataaxiom/ghcr-cleanup-action@d52806a0dc70b430571a37da1fde39733ffd640f  # v1.2.2
+      - name: Cleanup old images
+        uses: ghcr-manager/ghcr-cleanup-manager@1d5ec814fd3012b21396a7a43ce0fcb5b54486c3  # v1.1.5
         with:
+          command: cleanup
           token: ${{ secrets.GHCR_CLEANUP_PAT != '' && secrets.GHCR_CLEANUP_PAT || github.token }}
           owner: ${{ github.repository_owner }}
-          repository: ${{ github.event.repository.name }}
           package: ${{ needs.prepare-retention-regex.outputs.package_name }}
+          upload-artifacts: true
           use-regex: true
           delete-tags: '.*'
           keep-n-tagged: ${{ github.event_name == 'workflow_dispatch' && inputs.keep-n-tagged || 3 }}
