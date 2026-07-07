@@ -1,6 +1,6 @@
 # Development dependencies for running tests and linters.
 -r requirements.txt
 pymarkdownlnt>=0.9.38,<1
-pytest>=9.1.0,<10
+pytest>=9.1.1,<10
 pytest-cov>=7.1.0,<8
 yamllint>=1.38.0,<2
