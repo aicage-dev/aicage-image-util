@@ -1,0 +1,9 @@
+misconfigurations:
+  - id: AVD-DS-0002
+    paths:
+      - Dockerfile
+    statement: USER is setup on container start
+  - id: AVD-DS-0026
+    paths:
+      - Dockerfile
+    statement: HEALTHCHECK not needed, this always runs interactive
