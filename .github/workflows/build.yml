@@ -141,17 +141,19 @@ jobs:
           tags: ${{ env.IMAGE_TEST_TAG }}
 
       - name: "Test: Verify OCI labels on util image"
+        env:
+          EXPECTED_REVISION: ${{ steps.oci.outputs.revision }}
+          EXPECTED_CREATED: ${{ steps.oci.outputs.created }}
+          EXPECTED_VERSION: ${{ needs.resolve-ref.outputs.VERSION_TAG }}
+          BUILT_IMAGE_DIGEST: ${{ steps.build_image.outputs.digest }}
         run: |
           set -euo pipefail
-          expected_revision="${{ steps.oci.outputs.revision }}"
-          expected_created="${{ steps.oci.outputs.created }}"
-          expected_version="${{ needs.resolve-ref.outputs.VERSION_TAG }}"
-          docker pull "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}"
-          docker image inspect "${IMAGE_NAME}@${{ steps.build_image.outputs.digest }}" \
+          docker pull "${IMAGE_NAME}@${BUILT_IMAGE_DIGEST}"
+          docker image inspect "${IMAGE_NAME}@${BUILT_IMAGE_DIGEST}" \
             | jq -e \
-              --arg expected_revision "$expected_revision" \
-              --arg expected_created "$expected_created" \
-              --arg expected_version "$expected_version" '
+              --arg expected_revision "$EXPECTED_REVISION" \
+              --arg expected_created "$EXPECTED_CREATED" \
+              --arg expected_version "$EXPECTED_VERSION" '
               .[0].Config.Labels["org.opencontainers.image.description"]
                 == "Utility image for aicage runtime tasks"
               and .[0].Config.Labels["org.opencontainers.image.revision"] == $expected_revision
@@ -162,19 +164,23 @@ jobs:
       - name: Export digest (amd64)
         id: out-amd64
         if: matrix.arch == 'amd64'
+        env:
+          INDEX_DIGEST: ${{ steps.build_image.outputs.digest }}
         run: |
           set -euo pipefail
           (
-            echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}"
+            echo "INDEX_DIGEST=${INDEX_DIGEST}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
       - name: Export digest (arm64)
         id: out-arm64
         if: matrix.arch == 'arm64'
+        env:
+          INDEX_DIGEST: ${{ steps.build_image.outputs.digest }}
         run: |
           set -euo pipefail
           (
-            echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}"
+            echo "INDEX_DIGEST=${INDEX_DIGEST}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   multiarch:
@@ -213,17 +219,19 @@ jobs:
             org.opencontainers.image.version=${{ needs.resolve-ref.outputs.VERSION_TAG }}
 
       - name: Verify OCI annotations on published manifest
+        env:
+          EXPECTED_REVISION: ${{ needs.build.outputs.REVISION }}
+          EXPECTED_CREATED: ${{ needs.build.outputs.CREATED }}
+          EXPECTED_VERSION: ${{ needs.resolve-ref.outputs.VERSION_TAG }}
+          MANIFEST_DIGEST: ${{ steps.publish.outputs.manifest_digest }}
         run: |
           set -euo pipefail
-          expected_revision="${{ needs.build.outputs.REVISION }}"
-          expected_created="${{ needs.build.outputs.CREATED }}"
-          expected_version="${{ needs.resolve-ref.outputs.VERSION_TAG }}"
           docker buildx imagetools inspect \
-            --raw "ghcr.io/aicage/aicage-image-util@${{ steps.publish.outputs.manifest_digest }}" \
+            --raw "ghcr.io/aicage/aicage-image-util@${MANIFEST_DIGEST}" \
             | jq -e \
-              --arg expected_revision "$expected_revision" \
-              --arg expected_created "$expected_created" \
-              --arg expected_version "$expected_version" '
+              --arg expected_revision "$EXPECTED_REVISION" \
+              --arg expected_created "$EXPECTED_CREATED" \
+              --arg expected_version "$EXPECTED_VERSION" '
               .annotations["org.opencontainers.image.title"] == "aicage-image-util"
               and .annotations["org.opencontainers.image.description"]
                 == "Utility image for aicage runtime tasks"
