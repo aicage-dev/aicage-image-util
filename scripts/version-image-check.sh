@@ -14,8 +14,8 @@ get_image_version() {
   docker run --rm \
     -v "${script_path}:/tmp/${script_name}:ro" \
     "${VERSION_CHECK_IMAGE}" \
-      "/tmp/${script_name}" \
-      2>/dev/null
+    "/tmp/${script_name}" \
+    2>/dev/null
 }
 
 printf "%-20s %-20s %-24s %-10s\n" "Agent" "Host Version" "Util Image Version" "Mismatch"
