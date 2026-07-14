@@ -31,7 +31,7 @@ cosign verify-blob \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
   --certificate-identity-regexp "^https://github\.com/aicage/${AICAGE_REPO}/\.github/workflows/release\.yml@(?:refs/tags/.*|[0-9a-f]{40})$" \
   SHA256SUMS \
-   >&2
+  >&2
 
 echo "Verifying checksums ..." >&2
 
