@@ -1,0 +1,57 @@
+name: Close Pull Request
+description: Close an open pull request for a PR branch and base branch pair, if one exists.
+
+inputs:
+  github_token:
+    description: GitHub token used by the GitHub CLI.
+    required: true
+  repository:
+    description: Repository in owner/name format.
+    required: true
+  pr_branch:
+    description: Branch name used by the pull request.
+    required: true
+  base_branch:
+    description: Base branch name for the pull request.
+    required: true
+  close_comment:
+    description: Comment posted when closing the pull request.
+    required: false
+    default: Closing stale PR.
+
+runs:
+  using: composite
+  steps:
+    - name: Close pull request
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        REPOSITORY: ${{ inputs.repository }}
+        PR_BRANCH: ${{ inputs.pr_branch }}
+        BASE_BRANCH: ${{ inputs.base_branch }}
+        CLOSE_COMMENT: ${{ inputs.close_comment }}
+      run: |
+        set -euo pipefail
+
+        pr_match="$(
+          gh pr list \
+            --repo "${REPOSITORY}" \
+            --head "${PR_BRANCH}" \
+            --base "${BASE_BRANCH}" \
+            --state open \
+            --json number,title \
+            --jq 'if length == 0 then "" else "\(.[0].number)\t\(.[0].title)" end'
+        )"
+
+        if [[ -z "${pr_match}" ]]; then
+          exit 0
+        fi
+
+        IFS=$'\t' read -r pr_number pr_title <<< "${pr_match}"
+
+        gh pr close "${pr_number}" \
+          --repo "${REPOSITORY}" \
+          --delete-branch \
+          --comment "${CLOSE_COMMENT}"
+
+        echo "Closed PR #${pr_number}: ${pr_title}"
