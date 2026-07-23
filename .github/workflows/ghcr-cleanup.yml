@@ -82,8 +82,7 @@ jobs:
           done
           RELEASE_LIST="$(IFS='|'; echo "${ESCAPED_TAGS[*]}")"
 
-          ARCH_SUFFIX='(-amd64|-arm64)?'
-          EXCLUDE_TAGS_REGEX="^(agent-version|${RELEASE_LIST})${ARCH_SUFFIX}$"
+          EXCLUDE_TAGS_REGEX="^(agent-version|${RELEASE_LIST})$"
 
           {
             echo "exclude_tags_regex=${EXCLUDE_TAGS_REGEX}"
