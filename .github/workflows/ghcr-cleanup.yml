@@ -29,7 +29,6 @@ name: GHCR Cleanup
         default: info
 
 env:
-  # Repo-specific high-level knobs
   PACKAGE_NAME: aicage-image-util
 
 permissions:
