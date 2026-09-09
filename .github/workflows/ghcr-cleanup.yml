@@ -29,7 +29,7 @@ name: GHCR Cleanup
         default: info
 
 env:
-  PACKAGE_NAME: aicage-image-util
+  PACKAGE_NAME: ${{ github.event.repository.name }}
 
 permissions:
   contents: read
