@@ -2,6 +2,9 @@ name: "CI: lint"
 
 "on":
   workflow_call:
+  schedule:
+    # At 03:17 on Monday.
+    - cron: "17 3 * * 1"
   workflow_dispatch:
     inputs:
       fix_mode:
@@ -36,12 +39,16 @@ permissions:
 env:
   # create PR with fixes on:
   # - push to default branch
+  # - weekly schedule
   # - by choice on workflow_dispatch
   FIX_MODE: >-
     ${{
       (
-        github.event_name == 'push' &&
-        github.ref_name == github.event.repository.default_branch
+        github.event_name == 'schedule' ||
+        (
+          github.event_name == 'push' &&
+          github.ref_name == github.event.repository.default_branch
+        )
       ) && 'pull_request' || (github.event.inputs.fix_mode || 'none')
     }}
 
