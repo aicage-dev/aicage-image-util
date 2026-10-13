@@ -37,7 +37,7 @@ permissions:
 jobs:
   prepare-retention-regex:
     name: Prepare retention regex
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     outputs:
       package_name: ${{ steps.config.outputs.package_name }}
       exclude_tags_regex: ${{ steps.regex.outputs.exclude_tags_regex }}
@@ -92,7 +92,7 @@ jobs:
     needs: prepare-retention-regex
     permissions:
       packages: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     steps:
       - name: Cleanup old images
         uses: ghcr-manager/ghcr-cleanup-manager@3fea6c863f901f992c4996ac07d2680cdf8cae6b  # v1.1.12
