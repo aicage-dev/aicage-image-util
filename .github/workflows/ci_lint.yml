@@ -18,10 +18,10 @@ name: "CI: lint"
       runner:
         description: Runner used for this run
         required: false
-        default: ubuntu-latest
+        default: ubuntu-26.04
         type: choice
         options:
-          - ubuntu-latest
+          - ubuntu-26.04
           - self-hosted
 
 concurrency:
@@ -60,7 +60,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    runs-on: ${{ github.event.inputs.runner || 'ubuntu-latest' }}
+    runs-on: ${{ github.event.inputs.runner || 'ubuntu-26.04' }}
     env:
       BRANCH_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
     steps:
