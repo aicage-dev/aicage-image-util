@@ -11,6 +11,14 @@ permissions:
   contents: read
 
 jobs:
+  super-linter:
+    name: Run super-linter
+    uses: ./.github/workflows/ci_lint-super-linter.yml
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
   lint:
     uses: ./.github/workflows/lint.yml
     with:
@@ -20,6 +28,7 @@ jobs:
     name: "Required Status Checks"  # do not change, used in ruleset "Required Status Checks"
     if: ${{ always() }}
     needs:
+      - super-linter
       - lint
     runs-on: ubuntu-latest
     steps:
