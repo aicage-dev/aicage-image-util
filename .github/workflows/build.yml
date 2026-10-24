@@ -11,7 +11,7 @@ run-name: Build image util (${{ github.ref_name }})
   workflow_dispatch: {}
 
 concurrency:
-  group: build-image-util-${{ github.run_id }}
+  group: ${{ github.workflow_ref }}-${{ github.run_id }}
   cancel-in-progress: false
 
 permissions:
