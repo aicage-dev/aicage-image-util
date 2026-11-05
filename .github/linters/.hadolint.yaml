@@ -1,0 +1,3 @@
+ignored:
+  # Using latest is prone to errors if the image will ever update. Pin the version explicitly to a release tag.
+  - DL3007
