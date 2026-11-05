@@ -18,6 +18,12 @@ permissions:
   contents: read
   actions: read
 
+env:
+  OWNER: ${{ github.repository_owner }}
+  PACKAGE_NAME: ${{ github.event.repository.name }}
+  IMAGE_REPO: ghcr.io/${{ github.repository }}
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
 jobs:
   resolve-ref:
     runs-on: ubuntu-latest
@@ -33,19 +39,22 @@ jobs:
         id: ref
         run: |
           set -euo pipefail
-          if [[ "${GITHUB_EVENT_NAME}" == schedule ]]; then
+          if [[ "${GITHUB_EVENT_NAME}" == "schedule" ]]; then
             git fetch --tags
-            git_ref="$(git tag --list --sort=version:refname | tail -n 1)"
-            [[ -n "${git_ref}" ]] || { echo "No release tag found." >&2; exit 1; }
-            version_tag="${git_ref}"
+            GIT_REF="$(git tag --list --sort=version:refname | tail -n 1)"
+            if [[ -z "${GIT_REF}" ]]; then
+              echo "Git tag is empty for latest release" >&2
+              exit 1
+            fi
+            VERSION_TAG="${GIT_REF}"
           else
-            git_ref="${GITHUB_REF_NAME}"
-            version_tag="${GITHUB_SHA::7}"
+            GIT_REF="${GITHUB_REF_NAME}"
+            VERSION_TAG="${GITHUB_SHA::7}"
           fi
           {
-            echo "GIT_REF=${git_ref}"
-            echo "VERSION_TAG=${version_tag}"
-          } >> "$GITHUB_OUTPUT"
+            echo "GIT_REF=${GIT_REF}"
+            echo "VERSION_TAG=${VERSION_TAG}"
+          } | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   lint:
     needs: resolve-ref
