@@ -4,7 +4,7 @@
 
 ```bash
 cd aicage-image-util
-docker build -t ghcr.io/aicage/aicage-image-util:agent-version .
+docker build -f images/agent-version/Dockerfile -t ghcr.io/aicage/aicage-image-util:agent-version .
 ```
 
 ## CI publish
