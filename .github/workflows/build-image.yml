@@ -12,9 +12,6 @@ name: Build Utility Image
       variant:
         required: true
         type: string
-    secrets:
-      GITHUB_TOKEN:
-        required: true
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
