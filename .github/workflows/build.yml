@@ -89,6 +89,8 @@ jobs:
       CREATED: ${{ steps.oci.outputs.created }}
       INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
       INDEX_DIGEST_arm64: ${{ steps.out-arm64.outputs.INDEX_DIGEST }}
+      CREDENTIAL_INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.CREDENTIAL_INDEX_DIGEST }}
+      CREDENTIAL_INDEX_DIGEST_arm64: ${{ steps.out-arm64.outputs.CREDENTIAL_INDEX_DIGEST }}
       REVISION: ${{ steps.oci.outputs.revision }}
 
     steps:
@@ -145,6 +147,78 @@ jobs:
           package: ${{ env.PACKAGE_NAME }}
           tags: ${{ env.IMAGE_TEST_TAG }}
 
+      - name: Build credential-agent test image tag
+        id: build_credential_image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: credential/Dockerfile
+          push: true
+          provenance: mode=max
+          sbom: true
+          platforms: ${{ env.PLATFORM }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TEST_TAG }}-credential
+          labels: |
+            org.opencontainers.image.description=Credential-agent sidecar for aicage
+            org.opencontainers.image.revision=${{ steps.oci.outputs.revision }}
+            org.opencontainers.image.created=${{ steps.oci.outputs.created }}
+            org.opencontainers.image.version=${{ needs.resolve-ref.outputs.VERSION_TAG }}
+
+      - name: "Test: credential-agent SSH sidecar readiness"
+        env:
+          BUILT_IMAGE_DIGEST: ${{ steps.build_credential_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "${IMAGE_NAME}@${BUILT_IMAGE_DIGEST}"
+          socket_volume="aicage-credential-test-${RANDOM}-${RANDOM}"
+          sidecar="aicage-credential-test-${RANDOM}-${RANDOM}"
+          docker volume create "${socket_volume}"
+          docker run -d --name "${sidecar}" \
+            --mount "type=volume,src=${socket_volume},dst=/run/aicage-credential-agent" \
+            "${IMAGE_NAME}@${BUILT_IMAGE_DIGEST}" ssh serve
+          trap 'docker rm -f "${sidecar}"; docker volume rm "${socket_volume}"' EXIT
+          for _ in $(seq 1 20); do
+            if docker run --rm \
+              --mount "type=volume,src=${socket_volume},dst=/run/aicage-credential-agent" \
+              "${IMAGE_NAME}@${BUILT_IMAGE_DIGEST}" ssh ready; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: "Test: credential-agent GnuPG sidecar readiness"
+        env:
+          BUILT_IMAGE_DIGEST: ${{ steps.build_credential_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          socket_volume="aicage-credential-test-${RANDOM}-${RANDOM}"
+          sidecar="aicage-credential-test-${RANDOM}-${RANDOM}"
+          docker volume create "${socket_volume}"
+          docker run -d --name "${sidecar}" --entrypoint /bin/sh -e GNUPGHOME=/tmp/gnupg \
+            --mount "type=volume,src=${socket_volume},dst=/run/aicage-credential-agent" \
+            "${IMAGE_NAME}@${BUILT_IMAGE_DIGEST}" \
+            /bin/sh -c 'mkdir -p /tmp/gnupg && chmod 700 /tmp/gnupg && exec aicage-credential-agent gpg serve'
+          trap 'docker rm -f "${sidecar}"; docker volume rm "${socket_volume}"' EXIT
+          for _ in $(seq 1 20); do
+            if docker run --rm \
+              --mount "type=volume,src=${socket_volume},dst=/run/aicage-credential-agent" \
+              "${IMAGE_NAME}@${BUILT_IMAGE_DIGEST}" gpg ready; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Remove credential-agent test tag on image
+        uses: ghcr-manager/ghcr-untag-action@0ead7d5951f7e90be3783a110f342c22910008a4  # v1.0.9
+        with:
+          token: ${{ github.token }}
+          owner: ${{ github.repository_owner }}
+          package: ${{ env.PACKAGE_NAME }}
+          tags: ${{ env.IMAGE_TEST_TAG }}-credential
+
       - name: "Test: Verify OCI labels on util image"
         env:
           EXPECTED_REVISION: ${{ steps.oci.outputs.revision }}
@@ -175,6 +249,7 @@ jobs:
           set -euo pipefail
           (
             echo "INDEX_DIGEST=${INDEX_DIGEST}"
+            echo "CREDENTIAL_INDEX_DIGEST=${{ steps.build_credential_image.outputs.digest }}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
       - name: Export digest (arm64)
@@ -186,6 +261,7 @@ jobs:
           set -euo pipefail
           (
             echo "INDEX_DIGEST=${INDEX_DIGEST}"
+            echo "CREDENTIAL_INDEX_DIGEST=${{ steps.build_credential_image.outputs.digest }}"
           ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
 
   multiarch:
@@ -217,6 +293,24 @@ jobs:
           annotations: |
             org.opencontainers.image.title=${{ env.PACKAGE_NAME }}
             org.opencontainers.image.description=Utility image for aicage runtime tasks
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.revision=${{ needs.build.outputs.REVISION }}
+            org.opencontainers.image.created=${{ needs.build.outputs.CREATED }}
+            org.opencontainers.image.version=${{ needs.resolve-ref.outputs.VERSION_TAG }}
+
+      - name: Publish credential-agent multi-arch image
+        uses: gh-workflow/multiarch-image-publish@e235b287dc52113ee3fa98d09f5f81e5f4c7e93d  # 0.2.5
+        with:
+          image_ref: ${{ env.IMAGE_NAME }}
+          tags: |
+            credential-agent
+          platform_digests: |
+            linux/amd64=${{ needs.build.outputs.CREDENTIAL_INDEX_DIGEST_amd64 }}
+            linux/arm64=${{ needs.build.outputs.CREDENTIAL_INDEX_DIGEST_arm64 }}
+          annotations: |
+            org.opencontainers.image.title=${{ env.PACKAGE_NAME }} credential agent
+            org.opencontainers.image.description=Credential-agent sidecar for aicage
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.revision=${{ needs.build.outputs.REVISION }}
