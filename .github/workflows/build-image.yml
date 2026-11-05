@@ -31,7 +31,7 @@ env:
 
 jobs:
   build:
-    name: "${{ matrix.arch }}: ${{ inputs.variant }}"
+    name: "${{ matrix.arch }}: Build and test image"
     runs-on: ${{ matrix.runner }}
     permissions:
       packages: write
@@ -126,15 +126,16 @@ jobs:
         run: |
           set -euo pipefail
           docker pull "${IMAGE_NAME}@${INDEX_DIGEST}"
-          docker image inspect "${IMAGE_NAME}@${INDEX_DIGEST}" | jq -e \
-            --arg description "$EXPECTED_DESCRIPTION" \
-            --arg revision "$EXPECTED_REVISION" \
-            --arg created "$EXPECTED_CREATED" \
-            --arg version "$EXPECTED_VERSION" \
-            '.[0].Config.Labels["org.opencontainers.image.description"] == $description
-              and .[0].Config.Labels["org.opencontainers.image.revision"] == $revision
-              and .[0].Config.Labels["org.opencontainers.image.created"] == $created
-              and .[0].Config.Labels["org.opencontainers.image.version"] == $version' >/dev/null
+          docker image inspect "${IMAGE_NAME}@${INDEX_DIGEST}" \
+            | jq -e \
+              --arg description "$EXPECTED_DESCRIPTION" \
+              --arg revision "$EXPECTED_REVISION" \
+              --arg created "$EXPECTED_CREATED" \
+              --arg version "$EXPECTED_VERSION" \
+              '.[0].Config.Labels["org.opencontainers.image.description"] == $description
+                and .[0].Config.Labels["org.opencontainers.image.revision"] == $revision
+                and .[0].Config.Labels["org.opencontainers.image.created"] == $created
+                and .[0].Config.Labels["org.opencontainers.image.version"] == $version' >/dev/null
 
       - name: Export digest (amd64)
         id: out-amd64
@@ -204,17 +205,19 @@ jobs:
           EXPECTED_VERSION: ${{ inputs.version_tag }}
         run: |
           set -euo pipefail
-          docker buildx imagetools inspect --raw "${IMAGE_NAME}@${INDEX_DIGEST}" | jq -e \
-            --arg title "$EXPECTED_TITLE" \
-            --arg description "$EXPECTED_DESCRIPTION" \
-            --arg revision "$EXPECTED_REVISION" \
-            --arg created "$EXPECTED_CREATED" \
-            --arg version "$EXPECTED_VERSION" \
-            --arg source "$EXPECTED_SOURCE" \
-            '.annotations["org.opencontainers.image.title"] == $title
-              and .annotations["org.opencontainers.image.description"] == $description
-              and .annotations["org.opencontainers.image.source"] == $source
-              and .annotations["org.opencontainers.image.licenses"] == "Apache-2.0"
-              and .annotations["org.opencontainers.image.revision"] == $revision
-              and .annotations["org.opencontainers.image.created"] == $created
-              and .annotations["org.opencontainers.image.version"] == $version' >/dev/null
+          docker buildx imagetools inspect \
+            --raw "${IMAGE_NAME}@${INDEX_DIGEST}" \
+            | jq -e \
+              --arg title "$EXPECTED_TITLE" \
+              --arg description "$EXPECTED_DESCRIPTION" \
+              --arg revision "$EXPECTED_REVISION" \
+              --arg created "$EXPECTED_CREATED" \
+              --arg version "$EXPECTED_VERSION" \
+              --arg source "$EXPECTED_SOURCE" \
+              '.annotations["org.opencontainers.image.title"] == $title
+                and .annotations["org.opencontainers.image.description"] == $description
+                and .annotations["org.opencontainers.image.source"] == $source
+                and .annotations["org.opencontainers.image.licenses"] == "Apache-2.0"
+                and .annotations["org.opencontainers.image.revision"] == $revision
+                and .annotations["org.opencontainers.image.created"] == $created
+                and .annotations["org.opencontainers.image.version"] == $version' >/dev/null

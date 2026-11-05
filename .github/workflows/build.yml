@@ -63,7 +63,7 @@ jobs:
       git_ref: ${{ needs.resolve-ref.outputs.GIT_REF }}
 
   build:
-    name: Build ${{ matrix.variant }}
+    name: "${{ matrix.variant }}: Build and test image"
     needs: [resolve-ref, lint]
     permissions:
       packages: write
