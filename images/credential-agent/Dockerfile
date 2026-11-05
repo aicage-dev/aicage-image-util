@@ -1,4 +1,4 @@
-FROM alpine:3.23.7
+FROM alpine:3.24.3
 # TODO alpine:3.24.3 is latest, testing update by Renovate
 
 LABEL org.opencontainers.image.title="aicage-image-util credential agent" \
