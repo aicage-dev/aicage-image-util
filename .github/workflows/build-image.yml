@@ -3,14 +3,30 @@ name: Build Utility Image
 "on":
   workflow_call:
     inputs:
-      git_ref: { required: true, type: string }
-      unique: { required: true, type: string }
-      version_tag: { required: true, type: string }
-      variant: { required: true, type: string }
-      dockerfile: { required: true, type: string }
-      description: { required: true, type: string }
-      title: { required: true, type: string }
-      credential_test: { required: true, type: boolean }
+      git_ref:
+        required: true
+        type: string
+      unique:
+        required: true
+        type: string
+      version_tag:
+        required: true
+        type: string
+      variant:
+        required: true
+        type: string
+      dockerfile:
+        required: true
+        type: string
+      description:
+        required: true
+        type: string
+      title:
+        required: true
+        type: string
+      credential_test:
+        required: true
+        type: boolean
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -20,13 +36,18 @@ jobs:
   build:
     name: "${{ matrix.arch }}: ${{ inputs.variant }}"
     runs-on: ${{ matrix.runner }}
-    permissions: { packages: write }
+    permissions:
+      packages: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { arch: amd64, platform: linux/amd64, runner: ubuntu-latest }
-          - { arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm }
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
     outputs:
       CREATED: ${{ steps.oci.outputs.created }}
       INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
@@ -41,7 +62,8 @@ jobs:
         run: |
           { echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo "revision=$(git rev-parse HEAD)"; } >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
-        with: { driver: docker-container }
+        with:
+          driver: docker-container
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
         with:
           registry: ghcr.io
@@ -96,7 +118,9 @@ jobs:
 
   multiarch:
     needs: build
-    permissions: { packages: write, id-token: write }
+    permissions:
+      packages: write
+      id-token: write
     runs-on: ubuntu-latest
     steps:
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
