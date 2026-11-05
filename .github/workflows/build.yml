@@ -66,4 +66,5 @@ jobs:
       git_ref: ${{ needs.resolve-ref.outputs.GIT_REF }}
       version_tag: ${{ needs.resolve-ref.outputs.VERSION_TAG }}
       variant: ${{ matrix.variant }}
-    secrets: inherit
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

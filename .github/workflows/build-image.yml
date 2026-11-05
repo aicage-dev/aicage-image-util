@@ -12,6 +12,9 @@ name: Build Utility Image
       variant:
         required: true
         type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: true
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
@@ -81,13 +84,17 @@ jobs:
       - name: Verify OCI labels
         env:
           DIGEST: ${{ steps.build_image.outputs.digest }}
+          EXPECTED_CREATED: ${{ steps.oci.outputs.created }}
+          EXPECTED_DESCRIPTION: ${{ env.DESCRIPTION }}
+          EXPECTED_REVISION: ${{ steps.oci.outputs.revision }}
+          EXPECTED_VERSION: ${{ inputs.version_tag }}
         run: |
           docker pull "${IMAGE_NAME}@${DIGEST}"
           docker image inspect "${IMAGE_NAME}@${DIGEST}" | jq -e \
-            --arg description '${{ env.DESCRIPTION }}' \
-            --arg revision '${{ steps.oci.outputs.revision }}' \
-            --arg created '${{ steps.oci.outputs.created }}' \
-            --arg version '${{ inputs.version_tag }}' \
+            --arg description "$EXPECTED_DESCRIPTION" \
+            --arg revision "$EXPECTED_REVISION" \
+            --arg created "$EXPECTED_CREATED" \
+            --arg version "$EXPECTED_VERSION" \
             '.[0].Config.Labels["org.opencontainers.image.description"] == $description
               and .[0].Config.Labels["org.opencontainers.image.revision"] == $revision
               and .[0].Config.Labels["org.opencontainers.image.created"] == $created
@@ -105,10 +112,14 @@ jobs:
           tags: ${{ inputs.version_tag }}-${{ inputs.variant }}-${{ matrix.arch }}-test
       - id: out-amd64
         if: matrix.arch == 'amd64'
-        run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+        env:
+          DIGEST: ${{ steps.build_image.outputs.digest }}
+        run: echo "INDEX_DIGEST=${DIGEST}" >> "$GITHUB_OUTPUT"
       - id: out-arm64
         if: matrix.arch == 'arm64'
-        run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+        env:
+          DIGEST: ${{ steps.build_image.outputs.digest }}
+        run: echo "INDEX_DIGEST=${DIGEST}" >> "$GITHUB_OUTPUT"
 
   multiarch:
     needs: build
@@ -143,14 +154,20 @@ jobs:
       - name: Verify OCI annotations
         env:
           DIGEST: ${{ steps.publish.outputs.manifest_digest }}
+          EXPECTED_CREATED: ${{ needs.build.outputs.CREATED }}
+          EXPECTED_DESCRIPTION: ${{ env.DESCRIPTION }}
+          EXPECTED_REVISION: ${{ needs.build.outputs.REVISION }}
+          EXPECTED_SOURCE: https://github.com/${{ github.repository }}
+          EXPECTED_TITLE: ${{ env.TITLE }}
+          EXPECTED_VERSION: ${{ inputs.version_tag }}
         run: |
           docker buildx imagetools inspect --raw "${IMAGE_NAME}@${DIGEST}" | jq -e \
-            --arg title '${{ env.TITLE }}' \
-            --arg description '${{ env.DESCRIPTION }}' \
-            --arg revision '${{ needs.build.outputs.REVISION }}' \
-            --arg created '${{ needs.build.outputs.CREATED }}' \
-            --arg version '${{ inputs.version_tag }}' \
-            --arg source "https://github.com/${GITHUB_REPOSITORY}" \
+            --arg title "$EXPECTED_TITLE" \
+            --arg description "$EXPECTED_DESCRIPTION" \
+            --arg revision "$EXPECTED_REVISION" \
+            --arg created "$EXPECTED_CREATED" \
+            --arg version "$EXPECTED_VERSION" \
+            --arg source "$EXPECTED_SOURCE" \
             '.annotations["org.opencontainers.image.title"] == $title
               and .annotations["org.opencontainers.image.description"] == $description
               and .annotations["org.opencontainers.image.source"] == $source
