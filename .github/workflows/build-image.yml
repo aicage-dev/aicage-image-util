@@ -26,9 +26,8 @@ env:
     ${{ inputs.variant == 'agent-version' && github.event.repository.name ||
       format('{0} credential agent', github.event.repository.name) }}
   PUBLISH_TAGS: >-
-    ${{ inputs.variant == 'agent-version' &&
-      join(fromJSON(format('["{0}","agent-version"]', inputs.version_tag)), fromJSON('"\n"')) ||
-      'credential-agent' }}
+    ${{ join(fromJSON(format('["{0}-{1}","{0}"]', inputs.variant, inputs.version_tag)),
+      fromJSON('"\n"')) }}
 
 jobs:
   build:
