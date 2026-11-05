@@ -3,9 +3,11 @@ run-name: Build image util (${{ github.ref_name }})
 
 "on":
   schedule:
+    # Weekly on Tuesday at 02:23 UTC
     - cron: "23 2 * * 2"
   push:
-    tags: ["*"]
+    tags:
+      - "*"
   workflow_dispatch: {}
 
 concurrency:
@@ -23,10 +25,12 @@ jobs:
       GIT_REF: ${{ steps.ref.outputs.GIT_REF }}
       VERSION_TAG: ${{ steps.ref.outputs.VERSION_TAG }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
-      - id: ref
+      - name: Resolve git ref
+        id: ref
         run: |
           set -euo pipefail
           if [[ "${GITHUB_EVENT_NAME}" == schedule ]]; then
