@@ -1,0 +1,141 @@
+name: Build Utility Image
+
+"on":
+  workflow_call:
+    inputs:
+      git_ref: { required: true, type: string }
+      unique: { required: true, type: string }
+      version_tag: { required: true, type: string }
+      variant: { required: true, type: string }
+      dockerfile: { required: true, type: string }
+      description: { required: true, type: string }
+      title: { required: true, type: string }
+      credential_test: { required: true, type: boolean }
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  PACKAGE_NAME: ${{ github.event.repository.name }}
+
+jobs:
+  build:
+    name: "${{ matrix.arch }}: ${{ inputs.variant }}"
+    runs-on: ${{ matrix.runner }}
+    permissions: { packages: write }
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, platform: linux/amd64, runner: ubuntu-latest }
+          - { arch: arm64, platform: linux/arm64, runner: ubuntu-24.04-arm }
+    outputs:
+      CREATED: ${{ steps.oci.outputs.created }}
+      INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
+      INDEX_DIGEST_arm64: ${{ steps.out-arm64.outputs.INDEX_DIGEST }}
+      REVISION: ${{ steps.oci.outputs.revision }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.git_ref }}
+      - id: oci
+        run: |
+          { echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"; echo "revision=$(git rev-parse HEAD)"; } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+        with: { driver: docker-container }
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build_image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: ${{ inputs.dockerfile }}
+          push: true
+          provenance: mode=max
+          sbom: true
+          platforms: ${{ matrix.platform }}
+          tags: ${{ env.IMAGE_NAME }}:${{ inputs.unique }}-${{ inputs.variant }}-${{ matrix.arch }}-test
+          labels: |
+            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.revision=${{ steps.oci.outputs.revision }}
+            org.opencontainers.image.created=${{ steps.oci.outputs.created }}
+            org.opencontainers.image.version=${{ inputs.version_tag }}
+      - name: Verify OCI labels
+        env:
+          DIGEST: ${{ steps.build_image.outputs.digest }}
+        run: |
+          docker pull "${IMAGE_NAME}@${DIGEST}"
+          docker image inspect "${IMAGE_NAME}@${DIGEST}" | jq -e \
+            --arg description '${{ inputs.description }}' \
+            --arg revision '${{ steps.oci.outputs.revision }}' \
+            --arg created '${{ steps.oci.outputs.created }}' \
+            --arg version '${{ inputs.version_tag }}' \
+            '.[0].Config.Labels["org.opencontainers.image.description"] == $description
+              and .[0].Config.Labels["org.opencontainers.image.revision"] == $revision
+              and .[0].Config.Labels["org.opencontainers.image.created"] == $created
+              and .[0].Config.Labels["org.opencontainers.image.version"] == $version' >/dev/null
+      - name: Test credential-agent sockets
+        if: inputs.credential_test
+        env:
+          DIGEST: ${{ steps.build_image.outputs.digest }}
+        run: bash scripts/test-credential-agent.sh "${IMAGE_NAME}@${DIGEST}"
+      - uses: ghcr-manager/ghcr-untag-action@0ead7d5951f7e90be3783a110f342c22910008a4  # v1.0.9
+        with:
+          token: ${{ github.token }}
+          owner: ${{ github.repository_owner }}
+          package: ${{ env.PACKAGE_NAME }}
+          tags: ${{ inputs.unique }}-${{ inputs.variant }}-${{ matrix.arch }}-test
+      - id: out-amd64
+        if: matrix.arch == 'amd64'
+        run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+      - id: out-arm64
+        if: matrix.arch == 'arm64'
+        run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
+
+  multiarch:
+    needs: build
+    permissions: { packages: write, id-token: write }
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: publish
+        uses: gh-workflow/multiarch-image-publish@e235b287dc52113ee3fa98d09f5f81e5f4c7e93d  # 0.2.5
+        with:
+          image_ref: ${{ env.IMAGE_NAME }}
+          tags: |
+            ${{ inputs.variant == 'agent-version' && inputs.version_tag || 'credential-agent' }}
+            ${{ inputs.variant == 'agent-version' && 'agent-version' || '' }}
+          platform_digests: |
+            linux/amd64=${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+            linux/arm64=${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+          annotations: |
+            org.opencontainers.image.title=${{ inputs.title }}
+            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.revision=${{ needs.build.outputs.REVISION }}
+            org.opencontainers.image.created=${{ needs.build.outputs.CREATED }}
+            org.opencontainers.image.version=${{ inputs.version_tag }}
+      - name: Verify OCI annotations
+        env:
+          DIGEST: ${{ steps.publish.outputs.manifest_digest }}
+        run: |
+          docker buildx imagetools inspect --raw "${IMAGE_NAME}@${DIGEST}" | jq -e \
+            --arg title '${{ inputs.title }}' --arg description '${{ inputs.description }}' \
+            --arg revision '${{ needs.build.outputs.REVISION }}' \
+            --arg created '${{ needs.build.outputs.CREATED }}' \
+            --arg version '${{ inputs.version_tag }}' \
+            --arg source "https://github.com/${GITHUB_REPOSITORY}" \
+            '.annotations["org.opencontainers.image.title"] == $title
+              and .annotations["org.opencontainers.image.description"] == $description
+              and .annotations["org.opencontainers.image.source"] == $source
+              and .annotations["org.opencontainers.image.licenses"] == "Apache-2.0"
+              and .annotations["org.opencontainers.image.revision"] == $revision
+              and .annotations["org.opencontainers.image.created"] == $created
+              and .annotations["org.opencontainers.image.version"] == $version' >/dev/null
