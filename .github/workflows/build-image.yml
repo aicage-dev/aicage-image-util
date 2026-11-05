@@ -6,31 +6,25 @@ name: Build Utility Image
       git_ref:
         required: true
         type: string
-      unique:
-        required: true
-        type: string
       version_tag:
         required: true
         type: string
       variant:
         required: true
         type: string
-      dockerfile:
-        required: true
-        type: string
-      description:
-        required: true
-        type: string
-      title:
-        required: true
-        type: string
-      credential_test:
-        required: true
-        type: boolean
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
   PACKAGE_NAME: ${{ github.event.repository.name }}
+  DOCKERFILE: >-
+    ${{ inputs.variant == 'agent-version' && 'images/agent-version/Dockerfile' ||
+      'images/credential-agent/Dockerfile' }}
+  DESCRIPTION: >-
+    ${{ inputs.variant == 'agent-version' && 'Utility image for aicage runtime tasks' ||
+      'Credential-agent sidecar for aicage' }}
+  TITLE: >-
+    ${{ inputs.variant == 'agent-version' && 'aicage-image-util' ||
+      'aicage-image-util credential agent' }}
 
 jobs:
   build:
@@ -73,14 +67,14 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
         with:
           context: .
-          file: ${{ inputs.dockerfile }}
+          file: ${{ env.DOCKERFILE }}
           push: true
           provenance: mode=max
           sbom: true
           platforms: ${{ matrix.platform }}
-          tags: ${{ env.IMAGE_NAME }}:${{ inputs.unique }}-${{ inputs.variant }}-${{ matrix.arch }}-test
+          tags: ${{ env.IMAGE_NAME }}:${{ inputs.version_tag }}-${{ inputs.variant }}-${{ matrix.arch }}-test
           labels: |
-            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
             org.opencontainers.image.revision=${{ steps.oci.outputs.revision }}
             org.opencontainers.image.created=${{ steps.oci.outputs.created }}
             org.opencontainers.image.version=${{ inputs.version_tag }}
@@ -90,7 +84,7 @@ jobs:
         run: |
           docker pull "${IMAGE_NAME}@${DIGEST}"
           docker image inspect "${IMAGE_NAME}@${DIGEST}" | jq -e \
-            --arg description '${{ inputs.description }}' \
+            --arg description '${{ env.DESCRIPTION }}' \
             --arg revision '${{ steps.oci.outputs.revision }}' \
             --arg created '${{ steps.oci.outputs.created }}' \
             --arg version '${{ inputs.version_tag }}' \
@@ -99,7 +93,7 @@ jobs:
               and .[0].Config.Labels["org.opencontainers.image.created"] == $created
               and .[0].Config.Labels["org.opencontainers.image.version"] == $version' >/dev/null
       - name: Test credential-agent sockets
-        if: inputs.credential_test
+        if: inputs.variant == 'credential-agent'
         env:
           DIGEST: ${{ steps.build_image.outputs.digest }}
         run: bash images/credential-agent/test.sh "${IMAGE_NAME}@${DIGEST}"
@@ -108,7 +102,7 @@ jobs:
           token: ${{ github.token }}
           owner: ${{ github.repository_owner }}
           package: ${{ env.PACKAGE_NAME }}
-          tags: ${{ inputs.unique }}-${{ inputs.variant }}-${{ matrix.arch }}-test
+          tags: ${{ inputs.version_tag }}-${{ inputs.variant }}-${{ matrix.arch }}-test
       - id: out-amd64
         if: matrix.arch == 'amd64'
         run: echo "INDEX_DIGEST=${{ steps.build_image.outputs.digest }}" >> "$GITHUB_OUTPUT"
@@ -139,8 +133,8 @@ jobs:
             linux/amd64=${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
             linux/arm64=${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
           annotations: |
-            org.opencontainers.image.title=${{ inputs.title }}
-            org.opencontainers.image.description=${{ inputs.description }}
+            org.opencontainers.image.title=${{ env.TITLE }}
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses=Apache-2.0
             org.opencontainers.image.revision=${{ needs.build.outputs.REVISION }}
@@ -151,7 +145,8 @@ jobs:
           DIGEST: ${{ steps.publish.outputs.manifest_digest }}
         run: |
           docker buildx imagetools inspect --raw "${IMAGE_NAME}@${DIGEST}" | jq -e \
-            --arg title '${{ inputs.title }}' --arg description '${{ inputs.description }}' \
+            --arg title '${{ env.TITLE }}' \
+            --arg description '${{ env.DESCRIPTION }}' \
             --arg revision '${{ needs.build.outputs.REVISION }}' \
             --arg created '${{ needs.build.outputs.CREATED }}' \
             --arg version '${{ inputs.version_tag }}' \

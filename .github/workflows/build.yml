@@ -21,7 +21,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       GIT_REF: ${{ steps.ref.outputs.GIT_REF }}
-      UNIQUE: ${{ steps.ref.outputs.UNIQUE }}
       VERSION_TAG: ${{ steps.ref.outputs.VERSION_TAG }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -41,7 +40,6 @@ jobs:
           fi
           {
             echo "GIT_REF=${git_ref}"
-            echo "UNIQUE=${GITHUB_SHA::7}-$(uuidgen)"
             echo "VERSION_TAG=${version_tag}"
           } >> "$GITHUB_OUTPUT"
 
@@ -62,23 +60,10 @@ jobs:
       matrix:
         include:
           - variant: agent-version
-            dockerfile: images/agent-version/Dockerfile
-            description: Utility image for aicage runtime tasks
-            title: aicage-image-util
-            credential_test: false
           - variant: credential-agent
-            dockerfile: images/credential-agent/Dockerfile
-            description: Credential-agent sidecar for aicage
-            title: aicage-image-util credential agent
-            credential_test: true
     uses: ./.github/workflows/build-image.yml
     with:
       git_ref: ${{ needs.resolve-ref.outputs.GIT_REF }}
-      unique: ${{ needs.resolve-ref.outputs.UNIQUE }}
       version_tag: ${{ needs.resolve-ref.outputs.VERSION_TAG }}
       variant: ${{ matrix.variant }}
-      dockerfile: ${{ matrix.dockerfile }}
-      description: ${{ matrix.description }}
-      title: ${{ matrix.title }}
-      credential_test: ${{ matrix.credential_test }}
     secrets: inherit
