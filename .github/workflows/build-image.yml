@@ -25,6 +25,10 @@ env:
   TITLE: >-
     ${{ inputs.variant == 'agent-version' && github.event.repository.name ||
       format('{0} credential agent', github.event.repository.name) }}
+  PUBLISH_TAGS: >-
+    ${{ inputs.variant == 'agent-version' &&
+      join(fromJSON(format('["{0}","agent-version"]', inputs.version_tag)), fromJSON('"\n"')) ||
+      'credential-agent' }}
 
 jobs:
   build:
@@ -176,9 +180,7 @@ jobs:
         uses: gh-workflow/multiarch-image-publish@e235b287dc52113ee3fa98d09f5f81e5f4c7e93d  # 0.2.5
         with:
           image_ref: ${{ env.IMAGE_NAME }}
-          tags: |
-            ${{ inputs.variant == 'agent-version' && inputs.version_tag || 'credential-agent' }}
-            ${{ inputs.variant == 'agent-version' && 'agent-version' || '' }}
+          tags: ${{ env.PUBLISH_TAGS }}
           platform_digests: |
             linux/amd64=${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
             linux/arm64=${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
