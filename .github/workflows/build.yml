@@ -61,12 +61,12 @@ jobs:
       matrix:
         include:
           - variant: agent-version
-            dockerfile: Dockerfile
+            dockerfile: images/agent-version/Dockerfile
             description: Utility image for aicage runtime tasks
             title: aicage-image-util
             credential_test: false
           - variant: credential-agent
-            dockerfile: credential/Dockerfile
+            dockerfile: images/credential-agent/Dockerfile
             description: Credential-agent sidecar for aicage
             title: aicage-image-util credential agent
             credential_test: true

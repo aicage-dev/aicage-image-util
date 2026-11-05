@@ -80,7 +80,7 @@ jobs:
         if: inputs.credential_test
         env:
           DIGEST: ${{ steps.build_image.outputs.digest }}
-        run: bash scripts/test-credential-agent.sh "${IMAGE_NAME}@${DIGEST}"
+        run: bash images/credential-agent/test.sh "${IMAGE_NAME}@${DIGEST}"
       - uses: ghcr-manager/ghcr-untag-action@0ead7d5951f7e90be3783a110f342c22910008a4  # v1.0.9
         with:
           token: ${{ github.token }}

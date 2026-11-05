@@ -9,9 +9,9 @@ RUN apk add --no-cache \
     gnupg \
     openssh-client
 
-COPY credential/aicage-credential-agent /usr/local/bin/aicage-credential-agent
-COPY credential/aicage-credential-agent-ssh /usr/local/bin/aicage-credential-agent-ssh
-COPY credential/aicage-credential-agent-gpg /usr/local/bin/aicage-credential-agent-gpg
+COPY images/credential-agent/aicage-credential-agent /usr/local/bin/aicage-credential-agent
+COPY images/credential-agent/aicage-credential-agent-ssh /usr/local/bin/aicage-credential-agent-ssh
+COPY images/credential-agent/aicage-credential-agent-gpg /usr/local/bin/aicage-credential-agent-gpg
 
 RUN chmod 0755 /usr/local/bin/aicage-credential-agent \
     /usr/local/bin/aicage-credential-agent-ssh \
