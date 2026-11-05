@@ -1,4 +1,4 @@
-name: Build Utility Image
+name: Build Util Image
 
 "on":
   workflow_call:

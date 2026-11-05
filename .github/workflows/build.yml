@@ -1,4 +1,4 @@
-name: Build Image Util
+name: Build All Util Images
 run-name: Build image util (${{ github.ref_name }})
 
 "on":
