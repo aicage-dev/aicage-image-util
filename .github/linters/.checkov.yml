@@ -3,8 +3,6 @@ skip-check:
   - CKV_DOCKER_2
   # Ensure that a user for the container has been created
   - CKV_DOCKER_3
-  # Ensure the base image uses a non latest version tag
-  - CKV_DOCKER_7
   # Ensure the last USER is not root
   - CKV_DOCKER_8
   # Ensure the base image uses a non latest version tag

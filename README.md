@@ -20,10 +20,3 @@ docker run --rm \
   ghcr.io/aicage/aicage-image-util:agent-version \
   /bin/bash /agent/version.sh
 ```
-
-### credential-agent
-
-Runs persistent SSH or GnuPG agent sidecars for Aicage. Its sidecars expose only
-agent sockets to target containers.
-
-Published tag: `ghcr.io/aicage/aicage-image-util:credential-agent`.
