@@ -6,7 +6,7 @@ image_ref=""
 variant=""
 
 usage() {
-  echo "Usage: scripts/test.sh --variant agent-version --image <image-ref> [-- <bats-args>]" >&2
+  echo "Usage: scripts/test.sh --variant <agent-version|credential-agent> --image <image-ref> [-- <bats-args>]" >&2
   exit 64
 }
 
