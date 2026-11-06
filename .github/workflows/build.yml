@@ -73,6 +73,7 @@ jobs:
       matrix:
         include:
           - variant: agent-version
+          - variant: credential-agent
     uses: ./.github/workflows/build-image.yml
     with:
       git_ref: ${{ needs.resolve-ref.outputs.GIT_REF }}

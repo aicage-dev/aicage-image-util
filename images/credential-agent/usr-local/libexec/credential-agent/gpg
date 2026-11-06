@@ -1,0 +1,112 @@
+#!/bin/sh
+set -eu
+
+socket_dir="${GPG_SOCKET_DIR:-/run/credential-agent}"
+credential_home="${GNUPGHOME:-/credential/gnupg}"
+agent_home="${GPG_AGENT_HOME:-/tmp/credential-agent}"
+socket="$socket_dir/S.gpg-agent"
+
+initialize_agent_home() {
+  mkdir -p "$agent_home"
+  chmod 700 "$agent_home"
+  # gpg-agent creates its standard socket in its home, so keep that writable
+  # home outside the shared socket volume and copy only sidecar-local credentials.
+  for name in common.conf gpg.conf gpg-agent.conf pubring.kbx pubring.kbx~ trustdb.gpg private-keys-v1.d; do
+    if [ -e "$credential_home/$name" ]; then
+      cp -a "$credential_home/$name" "$agent_home/$name"
+    fi
+  done
+  if [ -f "$credential_home/public-keys.d/pubring.db" ]; then
+    mkdir -p "$agent_home/public-keys.d"
+    cp "$credential_home/public-keys.d/pubring.db" "$agent_home/public-keys.d/"
+  fi
+  gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase
+}
+
+keygrips_for_fingerprint() {
+  gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+    --list-keys "$1" | awk -F: '$1 == "grp" {print $10}'
+}
+
+signing_keygrips_for_fingerprint() {
+  gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+    --list-secret-keys "$1" | awk -F: '
+      $1 == "sec" || $1 == "ssb" { signing = index($12, "s") > 0; next }
+      $1 == "grp" && signing { print $10; signing = 0 }
+    '
+}
+
+case "${1:-}" in
+  serve)
+    rm -f "$socket"
+    initialize_agent_home
+    exec socat "UNIX-LISTEN:$socket,fork,mode=0600" "UNIX-CONNECT:$agent_home/S.gpg-agent"
+    ;;
+  ready)
+    gpg-connect-agent --raw-socket "$socket" /bye >/dev/null
+    ;;
+  load)
+    fingerprint="${2:?Usage: credential-agent gpg load FINGERPRINT}"
+    keygrips="$(keygrips_for_fingerprint "$fingerprint")"
+    test -n "$keygrips"
+    IFS= read -r passphrase
+    {
+      for keygrip in $keygrips; do
+        for cache_mode in '' '--restricted'; do
+          printf 'PRESET_PASSPHRASE %s %s -1 ' "$cache_mode" "$keygrip"
+          printf '%s' "$passphrase" | od -An -tx1 | tr -d ' \n'
+          printf '\n'
+        done
+      done
+      printf '/bye\n'
+    } | gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" >/dev/null
+    ;;
+  load-interactive)
+    fingerprint="${2:?Usage: credential-agent gpg load-interactive FINGERPRINT}"
+    signature="$(mktemp)"
+    trap 'rm -f "$signature"' EXIT HUP INT TERM
+    gpg --yes --homedir "$agent_home" --local-user "$fingerprint" --detach-sign \
+      --output "$signature" /dev/null
+    ;;
+  keygrips)
+    gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+      --list-secret-keys | awk -F: '$1 == "grp" {print $10}'
+    ;;
+  cached)
+    fingerprint="${2:?Usage: credential-agent gpg cached FINGERPRINT}"
+    keygrips="$(signing_keygrips_for_fingerprint "$fingerprint")"
+    test -n "$keygrips"
+    for keygrip in $keygrips; do
+      if ! gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
+        "KEYINFO $keygrip" /bye | awk -v keygrip="$keygrip" \
+        '$1 == "S" && $2 == "KEYINFO" && $3 == keygrip && NF >= 8 && $7 == "1" { found = 1 } END { exit !found }'; then
+        printf '%s\n' uncached
+        exit 0
+      fi
+    done
+    printf '%s\n' cached
+    ;;
+  protected)
+    fingerprint="${2:?Usage: credential-agent gpg protected FINGERPRINT}"
+    keygrips="$(signing_keygrips_for_fingerprint "$fingerprint")"
+    test -n "$keygrips"
+    for keygrip in $keygrips; do
+      if gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
+        "KEYINFO $keygrip" /bye | awk -v keygrip="$keygrip" \
+        '$1 == "S" && $2 == "KEYINFO" && $3 == keygrip && NF >= 8 && $8 == "P" { found = 1 } END { exit !found }'; then
+        printf '%s\n' protected
+        exit 0
+      fi
+    done
+    printf '%s\n' unprotected
+    ;;
+  reset)
+    gpgconf --homedir "$agent_home" --kill gpg-agent || true
+    rm -rf "${agent_home:?}"
+    initialize_agent_home
+    ;;
+  *)
+    echo "Usage: credential-agent gpg {cached|keygrips|load|load-interactive|protected|ready|reset|serve}" >&2
+    exit 64
+    ;;
+esac
