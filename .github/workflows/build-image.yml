@@ -1,0 +1,220 @@
+name: Build Util Image
+
+"on":
+  workflow_call:
+    inputs:
+      git_ref:
+        required: true
+        type: string
+      version_tag:
+        required: true
+        type: string
+      variant:
+        required: true
+        type: string
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+  PACKAGE_NAME: ${{ github.event.repository.name }}
+  DOCKERFILE: images/${{ inputs.variant }}/Dockerfile
+  DESCRIPTION: Utility image for aicage runtime tasks
+  TITLE: ${{ github.event.repository.name }}
+  PUBLISH_TAGS: >-
+    ${{ join(fromJSON(format('["{0}-{1}","{0}"]', inputs.variant, inputs.version_tag)),
+      fromJSON('"\n"')) }}
+
+jobs:
+  build:
+    name: "${{ matrix.arch }}: Build and test image"
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    env:
+      PLATFORM: ${{ matrix.platform }}
+      ARCH_SUFFIX: ${{ matrix.arch }}
+      AICAGE_VERSION: ${{ inputs.git_ref }}
+      IMAGE_TEST_TAG: ${{ inputs.version_tag }}-${{ inputs.variant }}-${{ matrix.arch }}-test
+    outputs:
+      CREATED: ${{ steps.oci.outputs.created }}
+      INDEX_DIGEST_amd64: ${{ steps.out-amd64.outputs.INDEX_DIGEST }}
+      INDEX_DIGEST_arm64: ${{ steps.out-arm64.outputs.INDEX_DIGEST }}
+      REVISION: ${{ steps.oci.outputs.revision }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.git_ref }}
+
+      - name: Resolve OCI labels
+        id: oci
+        run: |
+          set -euo pipefail
+          {
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "revision=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069  # v4.4.1
+        with:
+          driver: docker-container
+
+      - name: Log in to the container registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build test image tag
+        id: build_image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc  # v7.4.0
+        with:
+          context: .
+          file: ${{ env.DOCKERFILE }}
+          push: true
+          provenance: mode=max
+          sbom: true
+          platforms: ${{ env.PLATFORM }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TEST_TAG }}
+          labels: |
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+            org.opencontainers.image.revision=${{ steps.oci.outputs.revision }}
+            org.opencontainers.image.created=${{ steps.oci.outputs.created }}
+            org.opencontainers.image.version=${{ inputs.version_tag }}
+
+      - name: Remove test tag on image
+        uses: ghcr-manager/ghcr-untag-action@0ead7d5951f7e90be3783a110f342c22910008a4  # v1.0.9
+        with:
+          token: ${{ github.token }}
+          owner: ${{ github.repository_owner }}
+          package: ${{ env.PACKAGE_NAME }}
+          tags: ${{ env.IMAGE_TEST_TAG }}
+
+      - name: "Test: Setup BATS testing framework"
+        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43  # 4.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Test image
+        env:
+          IMAGE_REF: ${{ env.IMAGE_NAME }}@${{ steps.build_image.outputs.digest }}
+          IMAGE_VARIANT: ${{ inputs.variant }}
+        run: scripts/test.sh --variant "${IMAGE_VARIANT}" --image "${IMAGE_REF}"
+
+      - name: "Test: Verify OCI labels on util image"
+        env:
+          IMAGE_REF: ${{ env.IMAGE_NAME }}@${{ steps.build_image.outputs.digest }}
+          EXPECTED_CREATED: ${{ steps.oci.outputs.created }}
+          EXPECTED_DESCRIPTION: ${{ env.DESCRIPTION }}
+          EXPECTED_REVISION: ${{ steps.oci.outputs.revision }}
+          EXPECTED_VERSION: ${{ inputs.version_tag }}
+        run: |
+          set -euo pipefail
+          docker pull "${IMAGE_REF}"
+          docker image inspect "${IMAGE_REF}" \
+            | jq -e \
+              --arg description "$EXPECTED_DESCRIPTION" \
+              --arg revision "$EXPECTED_REVISION" \
+              --arg created "$EXPECTED_CREATED" \
+              --arg version "$EXPECTED_VERSION" \
+              '.[0].Config.Labels["org.opencontainers.image.description"] == $description
+                and .[0].Config.Labels["org.opencontainers.image.revision"] == $revision
+                and .[0].Config.Labels["org.opencontainers.image.created"] == $created
+                and .[0].Config.Labels["org.opencontainers.image.version"] == $version' >/dev/null
+
+      - name: Export digest (amd64)
+        id: out-amd64
+        if: matrix.arch == 'amd64'
+        env:
+          INDEX_DIGEST: ${{ steps.build_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          (
+            echo "INDEX_DIGEST=${INDEX_DIGEST}"
+          ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
+
+      - name: Export digest (arm64)
+        id: out-arm64
+        if: matrix.arch == 'arm64'
+        env:
+          INDEX_DIGEST: ${{ steps.build_image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          (
+            echo "INDEX_DIGEST=${INDEX_DIGEST}"
+          ) | tee /dev/stderr >> "$GITHUB_OUTPUT"
+
+  multiarch:
+    name: Run multi-arch sign/provenance/publish
+    needs: build
+    permissions:
+      packages: write
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to the container registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Use multi-arch publish action
+        id: publish
+        uses: gh-workflow/multiarch-image-publish@e235b287dc52113ee3fa98d09f5f81e5f4c7e93d  # 0.2.5
+        with:
+          image_ref: ${{ env.IMAGE_NAME }}
+          tags: ${{ env.PUBLISH_TAGS }}
+          platform_digests: |
+            linux/amd64=${{ needs.build.outputs.INDEX_DIGEST_amd64 }}
+            linux/arm64=${{ needs.build.outputs.INDEX_DIGEST_arm64 }}
+          annotations: |
+            org.opencontainers.image.title=${{ env.TITLE }}
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.revision=${{ needs.build.outputs.REVISION }}
+            org.opencontainers.image.created=${{ needs.build.outputs.CREATED }}
+            org.opencontainers.image.version=${{ inputs.version_tag }}
+
+      - name: Verify OCI annotations on published manifest
+        env:
+          INDEX_DIGEST: ${{ steps.publish.outputs.manifest_digest }}
+          EXPECTED_CREATED: ${{ needs.build.outputs.CREATED }}
+          EXPECTED_DESCRIPTION: ${{ env.DESCRIPTION }}
+          EXPECTED_REVISION: ${{ needs.build.outputs.REVISION }}
+          EXPECTED_SOURCE: https://github.com/${{ github.repository }}
+          EXPECTED_TITLE: ${{ env.TITLE }}
+          EXPECTED_VERSION: ${{ inputs.version_tag }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools inspect \
+            --raw "${IMAGE_NAME}@${INDEX_DIGEST}" \
+            | jq -e \
+              --arg title "$EXPECTED_TITLE" \
+              --arg description "$EXPECTED_DESCRIPTION" \
+              --arg revision "$EXPECTED_REVISION" \
+              --arg created "$EXPECTED_CREATED" \
+              --arg version "$EXPECTED_VERSION" \
+              --arg source "$EXPECTED_SOURCE" \
+              '.annotations["org.opencontainers.image.title"] == $title
+                and .annotations["org.opencontainers.image.description"] == $description
+                and .annotations["org.opencontainers.image.source"] == $source
+                and .annotations["org.opencontainers.image.licenses"] == "Apache-2.0"
+                and .annotations["org.opencontainers.image.revision"] == $revision
+                and .annotations["org.opencontainers.image.created"] == $created
+                and .annotations["org.opencontainers.image.version"] == $version' >/dev/null
