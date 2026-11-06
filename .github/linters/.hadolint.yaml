@@ -1,0 +1,5 @@
+ignored:
+  # Using latest is prone to errors if the image will ever update. Pin the version explicitly to a release tag.
+  - DL3007
+  # Pin versions in apk add. Instead of `apk add <package>` use `apk add <package>=<version>`
+  - DL3018

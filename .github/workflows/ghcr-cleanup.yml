@@ -81,7 +81,7 @@ jobs:
           done
           RELEASE_LIST="$(IFS='|'; echo "${ESCAPED_TAGS[*]}")"
 
-          EXCLUDE_TAGS_REGEX="^(agent-version|${RELEASE_LIST})$"
+          EXCLUDE_TAGS_REGEX="^(agent-version|credential-agent|${RELEASE_LIST})$"
 
           {
             echo "exclude_tags_regex=${EXCLUDE_TAGS_REGEX}"
