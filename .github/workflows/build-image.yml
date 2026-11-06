@@ -16,9 +16,15 @@ name: Build Util Image
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}
   PACKAGE_NAME: ${{ github.event.repository.name }}
-  DOCKERFILE: images/${{ inputs.variant }}/Dockerfile
-  DESCRIPTION: Utility image for aicage runtime tasks
-  TITLE: ${{ github.event.repository.name }}
+  DOCKERFILE: >-
+    ${{ inputs.variant == 'agent-version' && 'images/agent-version/Dockerfile' ||
+      'images/credential-agent/Dockerfile' }}
+  DESCRIPTION: >-
+    ${{ inputs.variant == 'agent-version' && 'Utility image for aicage runtime tasks' ||
+      'Credential-agent sidecar for aicage' }}
+  TITLE: >-
+    ${{ inputs.variant == 'agent-version' && github.event.repository.name ||
+      format('{0} credential agent', github.event.repository.name) }}
   PUBLISH_TAGS: >-
     ${{ join(fromJSON(format('["{0}-{1}","{0}"]', inputs.variant, inputs.version_tag)),
       fromJSON('"\n"')) }}
