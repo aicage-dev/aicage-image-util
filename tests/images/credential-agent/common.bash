@@ -143,16 +143,16 @@ assert_gpg_client_homes_have_no_secret_key_or_passphrase_artifacts() {
   shift
   local client_home
   for client_home in "$@"; do
-    test ! -d "$client_home/private-keys-v1.d" \
-      || test -z "$(find "$client_home/private-keys-v1.d" -type f -print -quit)"
+    test ! -d "$client_home/private-keys-v1.d" ||
+      test -z "$(find "$client_home/private-keys-v1.d" -type f -print -quit)"
     test ! -e "$client_home/secring.gpg"
     if [[ -n "$passphrase" ]] && find "$client_home" -type f -exec grep -aF -l -- "$passphrase" {} + | grep -q .; then
       return 1
     fi
     if docker run --rm --user "$host_user" -e GNUPGHOME=/client \
       --mount "type=bind,src=$client_home,dst=/client,readonly" \
-      --entrypoint gpg "$image_ref" --batch --with-colons --list-secret-keys \
-      | grep -qE '^(sec|ssb):'; then
+      --entrypoint gpg "$image_ref" --batch --with-colons --list-secret-keys |
+      grep -qE '^(sec|ssb):'; then
       return 1
     fi
   done
