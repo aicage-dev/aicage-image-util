@@ -8,3 +8,6 @@ dist/
 
 # megalinter adds this when using checkov
 /.megalinter_github_conf/
+
+# used in live tests
+/.credential-agent-test/
