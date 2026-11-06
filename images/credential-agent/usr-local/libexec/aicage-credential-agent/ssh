@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+socket="${AICAGE_SSH_AUTH_SOCK:-/run/aicage-credential-agent/ssh-agent.sock}"
+
+case "${1:-}" in
+  serve)
+    rm -f "$socket"
+    exec ssh-agent -D -a "$socket"
+    ;;
+  ready)
+    if SSH_AUTH_SOCK="$socket" ssh-add -l >/dev/null 2>&1; then
+      exit 0
+    else
+      [ "$?" -eq 1 ]
+    fi
+    ;;
+  load)
+    key_path="${2:?Usage: aicage-credential-agent ssh load KEY_PATH}"
+    key_copy="$(mktemp)"
+    trap 'rm -f "$key_copy"' EXIT HUP INT TERM
+    cp "$key_path" "$key_copy"
+    chmod 600 "$key_copy"
+    SSH_AUTH_SOCK="$socket" \
+      SSH_ASKPASS=/usr/local/libexec/aicage-credential-agent/ssh-askpass \
+      SSH_ASKPASS_REQUIRE=force \
+      DISPLAY=aicage \
+      ssh-add "$key_copy"
+    ;;
+  *)
+    echo "Usage: aicage-credential-agent ssh {load KEY_PATH|ready|serve}" >&2
+    exit 64
+    ;;
+esac
