@@ -1,0 +1,46 @@
+#!/bin/sh
+set -eu
+
+socket_dir="${GPG_SOCKET_DIR:-/run/credential-agent}"
+credential_home="${GNUPGHOME:-/credential/gnupg}"
+agent_home="${GPG_AGENT_HOME:-/tmp/credential-agent}"
+socket="$socket_dir/S.gpg-agent"
+
+case "${1:-}" in
+  serve)
+    rm -f "$socket"
+    mkdir -p "$agent_home"
+    chmod 700 "$agent_home"
+    # gpg-agent creates its standard socket in its home, so keep that writable
+    # home outside the shared socket volume and copy only sidecar-local credentials.
+    for name in gpg.conf gpg-agent.conf pubring.kbx pubring.kbx~ trustdb.gpg private-keys-v1.d; do
+      if [ -e "$credential_home/$name" ]; then
+        cp -a "$credential_home/$name" "$agent_home/$name"
+      fi
+    done
+    gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase --extra-socket "$socket"
+    exec tail -f /dev/null
+    ;;
+  ready)
+    gpg-connect-agent --raw-socket "$socket" /bye >/dev/null
+    ;;
+  load)
+    fingerprint="${2:?Usage: credential-agent gpg load FINGERPRINT}"
+    keygrip="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+      --list-secret-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10; exit}')"
+    test -n "$keygrip"
+    IFS= read -r passphrase
+    {
+      for cache_mode in '' '--restricted'; do
+        printf 'PRESET_PASSPHRASE %s %s -1 ' "$cache_mode" "$keygrip"
+        printf '%s' "$passphrase" | od -An -tx1 | tr -d ' \n'
+        printf '\n'
+      done
+      printf '/bye\n'
+    } | gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" >/dev/null
+    ;;
+  *)
+    echo "Usage: credential-agent gpg {load FINGERPRINT|ready|serve}" >&2
+    exit 64
+    ;;
+esac
