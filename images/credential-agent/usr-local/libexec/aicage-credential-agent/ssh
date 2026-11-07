@@ -2,6 +2,7 @@
 set -eu
 
 socket="${AICAGE_SSH_AUTH_SOCK:-/run/aicage-credential-agent/ssh-agent.sock}"
+error_file="${AICAGE_SSH_LOAD_ERROR_FILE:-/tmp/aicage-credential-agent/ssh-load-error}"
 
 case "${1:-}" in
   serve)
@@ -17,14 +18,24 @@ case "${1:-}" in
     ;;
   load)
     key_path="${2:?Usage: aicage-credential-agent ssh load KEY_PATH}"
-    SSH_AUTH_SOCK="$socket" \
+    mkdir -p "$(dirname "$error_file")"
+    rm -f "$error_file"
+    if SSH_AUTH_SOCK="$socket" \
       SSH_ASKPASS=/usr/local/libexec/aicage-credential-agent/ssh-askpass \
       SSH_ASKPASS_REQUIRE=force \
       DISPLAY=aicage \
-      ssh-add "$key_path"
+      ssh-add "$key_path" >"$error_file" 2>&1; then
+      rm -f "$error_file"
+    else
+      cat "$error_file" >&2
+      exit 1
+    fi
+    ;;
+  last-error)
+    test -f "$error_file" && cat "$error_file" || true
     ;;
   *)
-    echo "Usage: aicage-credential-agent ssh {load KEY_PATH|ready|serve}" >&2
+    echo "Usage: aicage-credential-agent ssh {last-error|load KEY_PATH|ready|serve}" >&2
     exit 64
     ;;
 esac
