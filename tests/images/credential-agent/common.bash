@@ -1,7 +1,7 @@
 image_ref="${AICAGE_IMAGE_UTIL_TEST_IMAGE:?Set AICAGE_IMAGE_UTIL_TEST_IMAGE}"
 test_root="$(git rev-parse --show-toplevel)/.credential-agent-test"
 host_user="$(id -u):$(id -g)"
-socket_directory="/run/aicage-credential-agent"
+socket_directory="/run/credential-agent"
 ssh_socket="$socket_directory/ssh-agent.sock"
 
 setup() {
@@ -34,14 +34,14 @@ new_test_directory() {
 
 new_sidecar_name() {
   local variable_name="$1"
-  local name="aicage-credential-agent-test-sidecar-$BATS_TEST_NUMBER-$RANDOM"
+  local name="credential-agent-test-sidecar-$BATS_TEST_NUMBER-$RANDOM"
   sidecars+=("$name")
   printf -v "$variable_name" '%s' "$name"
 }
 
 new_volume_name() {
   local variable_name="$1"
-  local name="aicage-credential-agent-test-volume-$BATS_TEST_NUMBER-$RANDOM"
+  local name="credential-agent-test-volume-$BATS_TEST_NUMBER-$RANDOM"
   volumes+=("$name")
   printf -v "$variable_name" '%s' "$name"
 }

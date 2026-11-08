@@ -13,4 +13,4 @@ RUN apk add --no-cache \
 # Credential-agent commands and private protocol implementations.
 COPY images/credential-agent/usr-local/ /usr/local/
 
-ENTRYPOINT ["aicage-credential-agent"]
+ENTRYPOINT ["credential-agent"]

@@ -1,9 +1,9 @@
 #!/bin/sh
 set -eu
 
-socket_dir="${AICAGE_GPG_SOCKET_DIR:-/run/aicage-credential-agent}"
+socket_dir="${GPG_SOCKET_DIR:-/run/credential-agent}"
 credential_home="${GNUPGHOME:-/credential/gnupg}"
-agent_home="${AICAGE_GPG_AGENT_HOME:-/tmp/aicage-credential-agent}"
+agent_home="${GPG_AGENT_HOME:-/tmp/credential-agent}"
 socket="$socket_dir/S.gpg-agent"
 
 case "${1:-}" in
@@ -25,7 +25,7 @@ case "${1:-}" in
     gpg-connect-agent --raw-socket "$socket" /bye >/dev/null
     ;;
   load)
-    fingerprint="${2:?Usage: aicage-credential-agent gpg load FINGERPRINT}"
+    fingerprint="${2:?Usage: credential-agent gpg load FINGERPRINT}"
     keygrip="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
       --list-secret-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10; exit}')"
     test -n "$keygrip"
@@ -40,7 +40,7 @@ case "${1:-}" in
     } | gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" >/dev/null
     ;;
   *)
-    echo "Usage: aicage-credential-agent gpg {load FINGERPRINT|ready|serve}" >&2
+    echo "Usage: credential-agent gpg {load FINGERPRINT|ready|serve}" >&2
     exit 64
     ;;
 esac

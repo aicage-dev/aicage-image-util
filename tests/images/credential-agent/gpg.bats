@@ -11,7 +11,7 @@ gpg_socket="$socket_directory/S.gpg-agent"
   docker volume create "$volume" >/dev/null
   docker run -d --name "$sidecar" --entrypoint /bin/sh -e GNUPGHOME=/tmp/gnupg \
     --mount "type=volume,src=$volume,dst=$socket_directory" "$image_ref" \
-    -c 'mkdir -p /tmp/gnupg && chmod 700 /tmp/gnupg && exec aicage-credential-agent gpg serve' >/dev/null
+    -c 'mkdir -p /tmp/gnupg && chmod 700 /tmp/gnupg && exec credential-agent gpg serve' >/dev/null
 
   wait_for_socket "$sidecar" "$volume" gpg
   assert_socket_volume_contains_only_sockets "$volume"
@@ -26,14 +26,14 @@ gpg_socket="$socket_directory/S.gpg-agent"
   create_protected_gpg_fixture "$credential_dir" fingerprint
   start_gpg_sidecar "$volume" "$sidecar" "$credential_dir"
   printf '%s\n' wrong-passphrase \
-    | docker exec -i --user "$host_user" "$sidecar" aicage-credential-agent gpg load "$fingerprint"
-  if docker exec --user "$host_user" "$sidecar" gpg --batch --homedir /tmp/aicage-credential-agent \
+    | docker exec -i --user "$host_user" "$sidecar" credential-agent gpg load "$fingerprint"
+  if docker exec --user "$host_user" "$sidecar" gpg --batch --homedir /tmp/credential-agent \
     --local-user "$fingerprint!" --detach-sign --output /tmp/signature /dev/null; then
     return 1
   fi
   printf '%s\n' test-passphrase \
-    | docker exec -i --user "$host_user" "$sidecar" aicage-credential-agent gpg load "$fingerprint"
-  docker exec --user "$host_user" "$sidecar" gpg --batch --homedir /tmp/aicage-credential-agent \
+    | docker exec -i --user "$host_user" "$sidecar" credential-agent gpg load "$fingerprint"
+  docker exec --user "$host_user" "$sidecar" gpg --batch --homedir /tmp/credential-agent \
     --local-user "$fingerprint!" --detach-sign --output /tmp/signature /dev/null
   assert_socket_volume_contains_only_sockets "$volume"
 }
@@ -47,7 +47,7 @@ gpg_socket="$socket_directory/S.gpg-agent"
   create_protected_gpg_fixture "$credential_dir" fingerprint
   start_gpg_sidecar "$volume" "$sidecar" "$credential_dir"
   if timeout 5 docker exec -i --user "$host_user" "$sidecar" \
-    aicage-credential-agent gpg load "$fingerprint" </dev/null; then
+    credential-agent gpg load "$fingerprint" </dev/null; then
     return 1
   fi
   assert_socket_volume_contains_only_sockets "$volume"
@@ -98,7 +98,7 @@ gpg_client_signs() {
   start_gpg_sidecar "$volume" "$sidecar" "$credential_dir"
   if [[ -n "$passphrase" ]]; then
     printf '%s\n' "$passphrase" \
-      | docker exec -i --user "$host_user" "$sidecar" aicage-credential-agent gpg load "$fingerprint"
+      | docker exec -i --user "$host_user" "$sidecar" credential-agent gpg load "$fingerprint"
   fi
   docker run --rm --user "$host_user" -e GNUPGHOME=/target \
     --mount "type=volume,src=$volume,dst=$socket_directory,readonly" \

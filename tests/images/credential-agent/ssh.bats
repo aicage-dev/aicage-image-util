@@ -2,7 +2,7 @@
 
 load "common.bash"
 
-sshd_image="aicage-credential-agent-test-sshd"
+sshd_image="credential-agent-test-sshd"
 
 setup_file() {
   docker build -t "$sshd_image" -f "$BATS_TEST_DIRNAME/sshd/Dockerfile" . >/dev/null
@@ -36,7 +36,7 @@ setup_file() {
   printf 'credential-agent test message\n' > "$message_dir/message"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
   printf '%s\n' test-passphrase \
-    | docker exec -i "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519
+    | docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
@@ -65,7 +65,7 @@ setup_file() {
 
   ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
-  docker exec "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
@@ -81,7 +81,7 @@ setup_file() {
   ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
   chmod 0777 "$credential_dir/id_ed25519"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
-  docker exec "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
@@ -97,10 +97,10 @@ setup_file() {
   ssh-keygen -q -t ed25519 -N test-passphrase -f "$credential_dir/id_ed25519"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
   if printf '%s\n' wrong-passphrase \
-    | docker exec -i "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519; then
+    | docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519; then
     return 1
   fi
-  if timeout 5 docker exec -i "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519 </dev/null; then
+  if timeout 5 docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 </dev/null; then
     return 1
   fi
   assert_socket_volume_contains_only_sockets "$volume"
@@ -118,8 +118,8 @@ setup_file() {
   docker run --rm --user "$host_user" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     "$image_ref" ssh ready
-  docker exec "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519_one
-  docker exec "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519_two
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_two
   test "$(docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -c ED25519)" -eq 2
@@ -134,7 +134,7 @@ setup_file() {
     --entrypoint ssh-add "$image_ref" -l; then
     return 1
   fi
-  docker exec "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519_one
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
