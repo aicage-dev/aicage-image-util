@@ -72,6 +72,22 @@ setup_file() {
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
+@test "SSH load accepts a permissive private key bind mount" {
+  local volume sidecar credential_dir
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  chmod 0777 "$credential_dir/id_ed25519"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" aicage-credential-agent ssh load /credential/ssh/id_ed25519
+  docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
+    --mount "type=volume,src=$volume,dst=$socket_directory" \
+    --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
 @test "SSH load rejects missing and wrong passphrases" {
   local volume sidecar credential_dir
   new_volume_name volume

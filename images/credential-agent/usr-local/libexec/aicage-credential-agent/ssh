@@ -20,11 +20,18 @@ case "${1:-}" in
     key_path="${2:?Usage: aicage-credential-agent ssh load KEY_PATH}"
     mkdir -p "$(dirname "$error_file")"
     rm -f "$error_file"
+    key_copy="$(mktemp)"
+    trap 'rm -f "$key_copy"' EXIT HUP INT TERM
+    if ! cp "$key_path" "$key_copy" >"$error_file" 2>&1; then
+      cat "$error_file" >&2
+      exit 1
+    fi
+    chmod 600 "$key_copy"
     if SSH_AUTH_SOCK="$socket" \
       SSH_ASKPASS=/usr/local/libexec/aicage-credential-agent/ssh-askpass \
       SSH_ASKPASS_REQUIRE=force \
       DISPLAY=aicage \
-      ssh-add "$key_path" >"$error_file" 2>&1; then
+      ssh-add "$key_copy" >"$error_file" 2>&1; then
       rm -f "$error_file"
     else
       cat "$error_file" >&2
