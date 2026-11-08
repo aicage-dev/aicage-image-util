@@ -106,17 +106,18 @@ setup_file() {
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
-@test "SSH load retains command error output" {
+@test "credential-agent dispatcher records SSH load errors" {
   local volume sidecar credential_dir
   new_volume_name volume
   new_sidecar_name sidecar
   new_test_directory credential_dir
 
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
-  if docker exec "$sidecar" aicage-credential-agent ssh load /credential/ssh/missing; then
+  if docker exec -e AICAGE_CREDENTIAL_AGENT_LOG_PATH=/tmp/credential-agent.log \
+    "$sidecar" aicage-credential-agent ssh load /credential/ssh/missing; then
     return 1
   fi
-  docker exec "$sidecar" aicage-credential-agent ssh last-error | grep -F "No such file"
+  docker exec "$sidecar" cat /tmp/credential-agent.log | grep -F "No such file"
 }
 
 @test "SSH sidecar recreation requires identity reload" {
