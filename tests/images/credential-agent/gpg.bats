@@ -53,6 +53,21 @@ gpg_socket="$socket_directory/S.gpg-agent"
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
+@test "GnuPG reports whether a secret key is protected" {
+  local volume sidecar credential_dir fingerprint
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+
+  create_protected_gpg_fixture "$credential_dir" fingerprint
+  start_gpg_sidecar "$volume" "$sidecar" "$credential_dir"
+
+  run docker exec --user "$host_user" "$sidecar" credential-agent gpg protected "$fingerprint"
+
+  [ "$status" -eq 0 ]
+  [ "$output" = protected ]
+}
+
 @test "GnuPG clients sign with protected and unprotected keys" {
   gpg_client_signs ""
   gpg_client_signs test-passphrase
