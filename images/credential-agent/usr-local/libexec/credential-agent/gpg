@@ -26,21 +26,37 @@ case "${1:-}" in
     ;;
   load)
     fingerprint="${2:?Usage: credential-agent gpg load FINGERPRINT}"
-    keygrip="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
-      --list-secret-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10; exit}')"
-    test -n "$keygrip"
+    keygrips="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+      --list-secret-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
+    test -n "$keygrips"
     IFS= read -r passphrase
     {
-      for cache_mode in '' '--restricted'; do
-        printf 'PRESET_PASSPHRASE %s %s -1 ' "$cache_mode" "$keygrip"
-        printf '%s' "$passphrase" | od -An -tx1 | tr -d ' \n'
-        printf '\n'
+      for keygrip in $keygrips; do
+        for cache_mode in '' '--restricted'; do
+          printf 'PRESET_PASSPHRASE %s %s -1 ' "$cache_mode" "$keygrip"
+          printf '%s' "$passphrase" | od -An -tx1 | tr -d ' \n'
+          printf '\n'
+        done
       done
       printf '/bye\n'
     } | gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" >/dev/null
     ;;
+  protected)
+    fingerprint="${2:?Usage: credential-agent gpg protected FINGERPRINT}"
+    keygrips="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+      --list-secret-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
+    test -n "$keygrips"
+    for keygrip in $keygrips; do
+      if gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
+        "KEYINFO $keygrip" /bye | awk '$1 == "S" && $2 == "KEYINFO" && $8 == "P" { found = 1 } END { exit !found }'; then
+        printf '%s\n' protected
+        exit 0
+      fi
+    done
+    printf '%s\n' unprotected
+    ;;
   *)
-    echo "Usage: credential-agent gpg {load FINGERPRINT|ready|serve}" >&2
+    echo "Usage: credential-agent gpg {load|protected FINGERPRINT|ready|serve}" >&2
     exit 64
     ;;
 esac
