@@ -27,7 +27,7 @@ case "${1:-}" in
   load)
     fingerprint="${2:?Usage: credential-agent gpg load FINGERPRINT}"
     keygrips="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
-      --list-secret-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
+      --list-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
     test -n "$keygrips"
     IFS= read -r passphrase
     {
@@ -44,7 +44,7 @@ case "${1:-}" in
   protected)
     fingerprint="${2:?Usage: credential-agent gpg protected FINGERPRINT}"
     keygrips="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
-      --list-secret-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
+      --list-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
     test -n "$keygrips"
     for keygrip in $keygrips; do
       if gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
