@@ -78,7 +78,7 @@ jobs:
           driver: docker-container
 
       - name: Log in to the container registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -111,7 +111,7 @@ jobs:
           tags: ${{ env.IMAGE_TEST_TAG }}
 
       - name: "Test: Setup BATS testing framework"
-        uses: bats-core/bats-action@77d6fb60505b4d0d1d73e48bd035b55074bbfb43  # 4.0.0
+        uses: bats-core/bats-action@3566550e0f594451ac0f58fcbfdeca93aa29a45e  # 4.1.0
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -173,7 +173,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Log in to the container registry
-        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6  # v4.7.0
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550  # v4.8.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
