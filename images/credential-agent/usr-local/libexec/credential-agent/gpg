@@ -18,8 +18,8 @@ case "${1:-}" in
         cp -a "$credential_home/$name" "$agent_home/$name"
       fi
     done
-    gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase --extra-socket "$socket"
-    exec tail -f /dev/null
+    gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase
+    exec socat "UNIX-LISTEN:$socket,fork,mode=0600" "UNIX-CONNECT:$agent_home/S.gpg-agent"
     ;;
   ready)
     gpg-connect-agent --raw-socket "$socket" /bye >/dev/null
