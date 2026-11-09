@@ -8,7 +8,8 @@ LABEL org.opencontainers.image.title="aicage-image-util credential agent" \
 # GnuPG: gnupg. SSH: openssh-client.
 RUN apk add --no-cache \
     gnupg \
-    openssh-client
+    openssh-client \
+    socat
 
 # Credential-agent commands and private protocol implementations.
 COPY images/credential-agent/usr-local/ /usr/local/
