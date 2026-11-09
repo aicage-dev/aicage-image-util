@@ -6,19 +6,28 @@ credential_home="${GNUPGHOME:-/credential/gnupg}"
 agent_home="${GPG_AGENT_HOME:-/tmp/credential-agent}"
 socket="$socket_dir/S.gpg-agent"
 
+initialize_agent_home() {
+  mkdir -p "$agent_home"
+  chmod 700 "$agent_home"
+  # gpg-agent creates its standard socket in its home, so keep that writable
+  # home outside the shared socket volume and copy only sidecar-local credentials.
+  for name in gpg.conf gpg-agent.conf pubring.kbx pubring.kbx~ trustdb.gpg private-keys-v1.d; do
+    if [ -e "$credential_home/$name" ]; then
+      cp -a "$credential_home/$name" "$agent_home/$name"
+    fi
+  done
+  gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase
+}
+
+keygrips_for_fingerprint() {
+  gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+    --list-keys "$1" | awk -F: '$1 == "grp" {print $10}'
+}
+
 case "${1:-}" in
   serve)
     rm -f "$socket"
-    mkdir -p "$agent_home"
-    chmod 700 "$agent_home"
-    # gpg-agent creates its standard socket in its home, so keep that writable
-    # home outside the shared socket volume and copy only sidecar-local credentials.
-    for name in gpg.conf gpg-agent.conf pubring.kbx pubring.kbx~ trustdb.gpg private-keys-v1.d; do
-      if [ -e "$credential_home/$name" ]; then
-        cp -a "$credential_home/$name" "$agent_home/$name"
-      fi
-    done
-    gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase
+    initialize_agent_home
     exec socat "UNIX-LISTEN:$socket,fork,mode=0600" "UNIX-CONNECT:$agent_home/S.gpg-agent"
     ;;
   ready)
@@ -26,8 +35,7 @@ case "${1:-}" in
     ;;
   load)
     fingerprint="${2:?Usage: credential-agent gpg load FINGERPRINT}"
-    keygrips="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
-      --list-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
+    keygrips="$(keygrips_for_fingerprint "$fingerprint")"
     test -n "$keygrips"
     IFS= read -r passphrase
     {
@@ -41,10 +49,26 @@ case "${1:-}" in
       printf '/bye\n'
     } | gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" >/dev/null
     ;;
+  keygrips)
+    gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+      --list-secret-keys | awk -F: '$1 == "grp" {print $10}'
+    ;;
+  cached)
+    fingerprint="${2:?Usage: credential-agent gpg cached FINGERPRINT}"
+    keygrips="$(keygrips_for_fingerprint "$fingerprint")"
+    test -n "$keygrips"
+    for keygrip in $keygrips; do
+      if ! gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
+        "KEYINFO $keygrip" /bye | awk '$1 == "S" && $2 == "KEYINFO" && $7 == "1" { found = 1 } END { exit !found }'; then
+        printf '%s\n' uncached
+        exit 0
+      fi
+    done
+    printf '%s\n' cached
+    ;;
   protected)
     fingerprint="${2:?Usage: credential-agent gpg protected FINGERPRINT}"
-    keygrips="$(gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
-      --list-keys "$fingerprint" | awk -F: '$1 == "grp" {print $10}')"
+    keygrips="$(keygrips_for_fingerprint "$fingerprint")"
     test -n "$keygrips"
     for keygrip in $keygrips; do
       if gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
@@ -55,8 +79,13 @@ case "${1:-}" in
     done
     printf '%s\n' unprotected
     ;;
+  reset)
+    gpgconf --homedir "$agent_home" --kill gpg-agent || true
+    rm -rf "${agent_home:?}"
+    initialize_agent_home
+    ;;
   *)
-    echo "Usage: credential-agent gpg {load|protected FINGERPRINT|ready|serve}" >&2
+    echo "Usage: credential-agent gpg {cached|keygrips|load|protected|ready|reset|serve}" >&2
     exit 64
     ;;
 esac

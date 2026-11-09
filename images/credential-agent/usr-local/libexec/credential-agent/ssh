@@ -15,6 +15,13 @@ case "${1:-}" in
       [ "$?" -eq 1 ]
     fi
     ;;
+  list)
+    if SSH_AUTH_SOCK="$socket" ssh-add -L; then
+      :
+    else
+      [ "$?" -eq 1 ]
+    fi
+    ;;
   load)
     key_path="${2:?Usage: credential-agent ssh load KEY_PATH}"
     key_copy="$(mktemp)"
@@ -27,8 +34,16 @@ case "${1:-}" in
       DISPLAY=dummy \
       ssh-add "$key_copy"
     ;;
+  remove)
+    key_copy="$(mktemp)"
+    trap 'rm -f "$key_copy"' EXIT HUP INT TERM
+    IFS= read -r public_key
+    test -n "$public_key"
+    printf '%s\n' "$public_key" > "$key_copy"
+    SSH_AUTH_SOCK="$socket" ssh-add -d "$key_copy"
+    ;;
   *)
-    echo "Usage: credential-agent ssh {load KEY_PATH|ready|serve}" >&2
+    echo "Usage: credential-agent ssh {list|load KEY_PATH|remove|ready|serve}" >&2
     exit 64
     ;;
 esac

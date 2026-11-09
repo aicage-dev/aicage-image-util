@@ -72,6 +72,31 @@ setup_file() {
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
+@test "SSH list and remove reconcile one identity" {
+  local volume sidecar credential_dir first_identity
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519_one"
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519_two"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_two
+  first_identity="$(cat "$credential_dir/id_ed25519_one.pub")"
+
+  run docker exec "$sidecar" credential-agent ssh list
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$first_identity"* ]]
+  printf '%s\n' "$first_identity" | docker exec -i "$sidecar" credential-agent ssh remove
+
+  run docker exec "$sidecar" credential-agent ssh list
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"$first_identity"* ]]
+  test "$(printf '%s\n' "$output" | wc -l)" -eq 1
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
 @test "SSH load accepts a permissive private key bind mount" {
   local volume sidecar credential_dir
   new_volume_name volume
