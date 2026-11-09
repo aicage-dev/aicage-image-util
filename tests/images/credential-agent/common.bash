@@ -94,8 +94,8 @@ create_host_gpg_fixture() {
   GNUPGHOME="$credential_dir" gpg --batch --passphrase '' \
     --quick-generate-key credential-agent-host@example.invalid ed25519 sign never
   local fixture_fingerprint
-  fixture_fingerprint="$(GNUPGHOME="$credential_dir" gpg --batch --with-colons --list-secret-keys \
-    | awk -F: '/^fpr:/ {print $10; exit}')"
+  fixture_fingerprint="$(GNUPGHOME="$credential_dir" gpg --batch --with-colons --list-secret-keys |
+    awk -F: '/^fpr:/ {print $10; exit}')"
   printf -v "$fingerprint_variable" '%s' "$fixture_fingerprint"
 }
 
