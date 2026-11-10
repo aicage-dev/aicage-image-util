@@ -20,6 +20,20 @@ setup_file() {
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
+@test "SSH list returns no output when the agent has no identities" {
+  local volume sidecar
+  new_volume_name volume
+  new_sidecar_name sidecar
+  docker volume create "$volume" >/dev/null
+  docker run -d --name "$sidecar" --mount "type=volume,src=$volume,dst=$socket_directory" \
+    "$image_ref" ssh serve >/dev/null
+
+  wait_for_socket "$sidecar" "$volume" ssh
+  run docker exec "$sidecar" credential-agent ssh list
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "encrypted SSH key loads and authenticates" {
   local volume sidecar credential_dir public_dir message_dir sshd
   new_volume_name volume
