@@ -59,7 +59,8 @@ case "${1:-}" in
     test -n "$keygrips"
     for keygrip in $keygrips; do
       if ! gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
-        "KEYINFO $keygrip" /bye | awk '$1 == "S" && $2 == "KEYINFO" && $7 == "1" { found = 1 } END { exit !found }'; then
+        "KEYINFO $keygrip" /bye | awk -v keygrip="$keygrip" \
+        '$1 == "S" && $2 == "KEYINFO" && $3 == keygrip && NF >= 8 && $7 == "1" { found = 1 } END { exit !found }'; then
         printf '%s\n' uncached
         exit 0
       fi
@@ -72,7 +73,8 @@ case "${1:-}" in
     test -n "$keygrips"
     for keygrip in $keygrips; do
       if gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
-        "KEYINFO $keygrip" /bye | awk '$1 == "S" && $2 == "KEYINFO" && $8 == "P" { found = 1 } END { exit !found }'; then
+        "KEYINFO $keygrip" /bye | awk -v keygrip="$keygrip" \
+        '$1 == "S" && $2 == "KEYINFO" && $3 == keygrip && NF >= 8 && $8 == "P" { found = 1 } END { exit !found }'; then
         printf '%s\n' protected
         exit 0
       fi
