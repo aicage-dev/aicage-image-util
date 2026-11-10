@@ -16,8 +16,8 @@ case "${1:-}" in
     fi
     ;;
   list)
-    if SSH_AUTH_SOCK="$socket" ssh-add -L; then
-      :
+    if identities="$(SSH_AUTH_SOCK="$socket" ssh-add -L)"; then
+      printf '%s\n' "$identities"
     else
       [ "$?" -eq 1 ]
     fi
