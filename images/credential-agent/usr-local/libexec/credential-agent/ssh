@@ -34,6 +34,14 @@ case "${1:-}" in
       DISPLAY=dummy \
       ssh-add "$key_copy"
     ;;
+  load-interactive)
+    key_path="${2:?Usage: credential-agent ssh load-interactive KEY_PATH}"
+    key_copy="$(mktemp)"
+    trap 'rm -f "$key_copy"' EXIT HUP INT TERM
+    cp "$key_path" "$key_copy"
+    chmod 600 "$key_copy"
+    SSH_AUTH_SOCK="$socket" ssh-add "$key_copy"
+    ;;
   remove)
     key_copy="$(mktemp)"
     trap 'rm -f "$key_copy"' EXIT HUP INT TERM
@@ -43,7 +51,7 @@ case "${1:-}" in
     SSH_AUTH_SOCK="$socket" ssh-add -d "$key_copy"
     ;;
   *)
-    echo "Usage: credential-agent ssh {list|load KEY_PATH|remove|ready|serve}" >&2
+    echo "Usage: credential-agent ssh {list|load KEY_PATH|load-interactive KEY_PATH|remove|ready|serve}" >&2
     exit 64
     ;;
 esac
