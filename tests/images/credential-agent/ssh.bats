@@ -101,6 +101,36 @@ setup_file() {
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
+@test "SSH load removes its supplied copy path" {
+  local volume sidecar credential_dir copy_path
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+  copy_path=/tmp/aicage-test-home/.ssh/id_ed25519
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 "$copy_path"
+  run docker exec "$sidecar" test ! -e "$copy_path"
+  [ "$status" -eq 0 ]
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
+@test "interactive SSH load removes its supplied copy path" {
+  local volume sidecar credential_dir copy_path
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+  copy_path=/tmp/aicage-test-home/.ssh/id_ed25519
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" credential-agent ssh load-interactive /credential/ssh/id_ed25519 "$copy_path"
+  run docker exec "$sidecar" test ! -e "$copy_path"
+  [ "$status" -eq 0 ]
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
 @test "SSH list and remove reconcile one identity" {
   local volume sidecar credential_dir first_identity
   new_volume_name volume
