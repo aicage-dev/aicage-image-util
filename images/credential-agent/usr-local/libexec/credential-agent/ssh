@@ -24,7 +24,10 @@ case "${1:-}" in
     ;;
   load)
     key_path="${2:?Usage: credential-agent ssh load KEY_PATH}"
-    key_copy="$(mktemp)"
+    key_copy="${3:?Usage: credential-agent ssh load KEY_PATH COPY_PATH}"
+    umask 077
+    mkdir -p "$(dirname "$key_copy")"
+    chmod 700 "$(dirname "$key_copy")"
     trap 'rm -f "$key_copy"' EXIT HUP INT TERM
     cp "$key_path" "$key_copy"
     chmod 600 "$key_copy"
@@ -36,7 +39,10 @@ case "${1:-}" in
     ;;
   load-interactive)
     key_path="${2:?Usage: credential-agent ssh load-interactive KEY_PATH}"
-    key_copy="$(mktemp)"
+    key_copy="${3:?Usage: credential-agent ssh load-interactive KEY_PATH COPY_PATH}"
+    umask 077
+    mkdir -p "$(dirname "$key_copy")"
+    chmod 700 "$(dirname "$key_copy")"
     trap 'rm -f "$key_copy"' EXIT HUP INT TERM
     cp "$key_path" "$key_copy"
     chmod 600 "$key_copy"

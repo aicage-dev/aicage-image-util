@@ -8,6 +8,10 @@ setup_file() {
   docker build -t "$sshd_image" -f "$BATS_TEST_DIRNAME/sshd/Dockerfile" . >/dev/null
 }
 
+credential_copy_path() {
+  printf '/tmp/aicage-test-home/.ssh/%s\n' "${1##*/}"
+}
+
 @test "SSH socket is ready from another container" {
   local volume sidecar
   new_volume_name volume
@@ -50,7 +54,7 @@ setup_file() {
   printf 'credential-agent test message\n' > "$message_dir/message"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
   printf '%s\n' test-passphrase \
-    | docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519
+    | docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 "$(credential_copy_path /credential/ssh/id_ed25519)"
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
@@ -79,7 +83,7 @@ setup_file() {
 
   ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
-  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 "$(credential_copy_path /credential/ssh/id_ed25519)"
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
@@ -94,10 +98,40 @@ setup_file() {
 
   ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
-  docker exec "$sidecar" credential-agent ssh load-interactive /credential/ssh/id_ed25519
+  docker exec "$sidecar" credential-agent ssh load-interactive /credential/ssh/id_ed25519 "$(credential_copy_path /credential/ssh/id_ed25519)"
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
+@test "SSH load removes its supplied copy path" {
+  local volume sidecar credential_dir copy_path
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+  copy_path=/tmp/aicage-test-home/.ssh/id_ed25519
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 "$copy_path"
+  run docker exec "$sidecar" test ! -e "$copy_path"
+  [ "$status" -eq 0 ]
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
+@test "interactive SSH load removes its supplied copy path" {
+  local volume sidecar credential_dir copy_path
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+  copy_path=/tmp/aicage-test-home/.ssh/id_ed25519
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" credential-agent ssh load-interactive /credential/ssh/id_ed25519 "$copy_path"
+  run docker exec "$sidecar" test ! -e "$copy_path"
+  [ "$status" -eq 0 ]
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
@@ -110,8 +144,8 @@ setup_file() {
   ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519_one"
   ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519_two"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
-  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one
-  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_two
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one "$(credential_copy_path /credential/ssh/id_ed25519_one)"
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_two "$(credential_copy_path /credential/ssh/id_ed25519_two)"
   first_identity="$(cat "$credential_dir/id_ed25519_one.pub")"
 
   run docker exec "$sidecar" credential-agent ssh list
@@ -135,7 +169,7 @@ setup_file() {
   ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
   chmod 0777 "$credential_dir/id_ed25519"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
-  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 "$(credential_copy_path /credential/ssh/id_ed25519)"
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
@@ -151,10 +185,10 @@ setup_file() {
   ssh-keygen -q -t ed25519 -N test-passphrase -f "$credential_dir/id_ed25519"
   start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
   if printf '%s\n' wrong-passphrase \
-    | docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519; then
+    | docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 "$(credential_copy_path /credential/ssh/id_ed25519)"; then
     return 1
   fi
-  if timeout 5 docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 </dev/null; then
+  if timeout 5 docker exec -i "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 "$(credential_copy_path /credential/ssh/id_ed25519)" </dev/null; then
     return 1
   fi
   assert_socket_volume_contains_only_sockets "$volume"
@@ -172,8 +206,8 @@ setup_file() {
   docker run --rm --user "$host_user" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     "$image_ref" ssh ready
-  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one
-  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_two
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one "$(credential_copy_path /credential/ssh/id_ed25519_one)"
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_two "$(credential_copy_path /credential/ssh/id_ed25519_two)"
   test "$(docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -c ED25519)" -eq 2
@@ -188,7 +222,7 @@ setup_file() {
     --entrypoint ssh-add "$image_ref" -l; then
     return 1
   fi
-  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519_one "$(credential_copy_path /credential/ssh/id_ed25519_one)"
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
