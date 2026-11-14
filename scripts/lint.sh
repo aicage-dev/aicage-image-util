@@ -6,7 +6,7 @@ find_shebang_scripts() {
   local first_line script
   local pattern="^#!.*[/[:space:]](${shells})([[:space:]]|$)"
   while IFS= read -r -d '' script; do
-    IFS= read -r first_line < "$script" || true
+    IFS= read -r first_line <"$script" || true
     if [[ "$first_line" =~ $pattern ]]; then
       printf '%s\n' "$script"
     fi
