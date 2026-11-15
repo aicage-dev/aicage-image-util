@@ -49,6 +49,13 @@ case "${1:-}" in
       printf '/bye\n'
     } | gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" >/dev/null
     ;;
+  load-interactive)
+    fingerprint="${2:?Usage: credential-agent gpg load-interactive FINGERPRINT}"
+    signature="$(mktemp)"
+    trap 'rm -f "$signature"' EXIT HUP INT TERM
+    gpg --homedir "$agent_home" --local-user "$fingerprint" --detach-sign \
+      --output "$signature" /dev/null
+    ;;
   keygrips)
     gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
       --list-secret-keys | awk -F: '$1 == "grp" {print $10}'
@@ -87,7 +94,7 @@ case "${1:-}" in
     initialize_agent_home
     ;;
   *)
-    echo "Usage: credential-agent gpg {cached|keygrips|load|protected|ready|reset|serve}" >&2
+    echo "Usage: credential-agent gpg {cached|keygrips|load|load-interactive|protected|ready|reset|serve}" >&2
     exit 64
     ;;
 esac

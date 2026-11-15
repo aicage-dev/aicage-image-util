@@ -9,6 +9,7 @@ LABEL org.opencontainers.image.title="aicage-image-util credential agent" \
 RUN apk add --no-cache \
     gnupg \
     openssh-client \
+    pinentry \
     socat
 
 # Credential-agent commands and private protocol implementations.
