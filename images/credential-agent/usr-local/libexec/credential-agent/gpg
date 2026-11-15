@@ -57,7 +57,7 @@ case "${1:-}" in
     fingerprint="${2:?Usage: credential-agent gpg load-interactive FINGERPRINT}"
     signature="$(mktemp)"
     trap 'rm -f "$signature"' EXIT HUP INT TERM
-    gpg --homedir "$agent_home" --local-user "$fingerprint" --detach-sign \
+    gpg --yes --homedir "$agent_home" --local-user "$fingerprint" --detach-sign \
       --output "$signature" /dev/null
     ;;
   keygrips)
