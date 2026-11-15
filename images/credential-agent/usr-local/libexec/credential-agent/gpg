@@ -11,11 +11,15 @@ initialize_agent_home() {
   chmod 700 "$agent_home"
   # gpg-agent creates its standard socket in its home, so keep that writable
   # home outside the shared socket volume and copy only sidecar-local credentials.
-  for name in gpg.conf gpg-agent.conf pubring.kbx pubring.kbx~ trustdb.gpg private-keys-v1.d; do
+  for name in common.conf gpg.conf gpg-agent.conf pubring.kbx pubring.kbx~ trustdb.gpg private-keys-v1.d; do
     if [ -e "$credential_home/$name" ]; then
       cp -a "$credential_home/$name" "$agent_home/$name"
     fi
   done
+  if [ -f "$credential_home/public-keys.d/pubring.db" ]; then
+    mkdir -p "$agent_home/public-keys.d"
+    cp "$credential_home/public-keys.d/pubring.db" "$agent_home/public-keys.d/"
+  fi
   gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase
 }
 
