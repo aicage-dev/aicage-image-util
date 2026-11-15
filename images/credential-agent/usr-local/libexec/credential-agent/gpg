@@ -28,6 +28,14 @@ keygrips_for_fingerprint() {
     --list-keys "$1" | awk -F: '$1 == "grp" {print $10}'
 }
 
+signing_keygrips_for_fingerprint() {
+  gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+    --list-secret-keys "$1" | awk -F: '
+      $1 == "sec" || $1 == "ssb" { signing = index($12, "s") > 0; next }
+      $1 == "grp" && signing { print $10; signing = 0 }
+    '
+}
+
 case "${1:-}" in
   serve)
     rm -f "$socket"
@@ -66,7 +74,7 @@ case "${1:-}" in
     ;;
   cached)
     fingerprint="${2:?Usage: credential-agent gpg cached FINGERPRINT}"
-    keygrips="$(keygrips_for_fingerprint "$fingerprint")"
+    keygrips="$(signing_keygrips_for_fingerprint "$fingerprint")"
     test -n "$keygrips"
     for keygrip in $keygrips; do
       if ! gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
@@ -80,7 +88,7 @@ case "${1:-}" in
     ;;
   protected)
     fingerprint="${2:?Usage: credential-agent gpg protected FINGERPRINT}"
-    keygrips="$(keygrips_for_fingerprint "$fingerprint")"
+    keygrips="$(signing_keygrips_for_fingerprint "$fingerprint")"
     test -n "$keygrips"
     for keygrip in $keygrips; do
       if gpg-connect-agent --raw-socket "$agent_home/S.gpg-agent" \
