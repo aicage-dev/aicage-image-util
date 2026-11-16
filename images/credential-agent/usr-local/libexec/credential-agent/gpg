@@ -18,6 +18,8 @@ initialize_agent_home() {
   done
   if [ -f "$credential_home/public-keys.d/pubring.db" ]; then
     mkdir -p "$agent_home/public-keys.d"
+    # TODO: Copy live sqlite DB properly
+    # See https://blog.echo.sh/posts/2026-03-03-copying-a-live-sqlite-database/
     cp "$credential_home/public-keys.d/pubring.db" "$agent_home/public-keys.d/"
   fi
   gpg-agent --daemon --homedir "$agent_home" --allow-preset-passphrase
