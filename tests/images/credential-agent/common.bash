@@ -68,13 +68,6 @@ wait_for_socket() {
   return 1
 }
 
-prepare_socket_volume() {
-  local volume="$1"
-  docker run --rm --entrypoint /bin/sh \
-    --mount "type=volume,src=$volume,dst=$socket_directory" "$image_ref" -c \
-    "chown $host_user $socket_directory"
-}
-
 create_protected_gpg_fixture() {
   local credential_dir="$1"
   local fingerprint_variable="$2"
@@ -116,8 +109,8 @@ start_gpg_sidecar() {
   local sidecar="$2"
   local credential_dir="$3"
   docker volume create "$volume" >/dev/null
-  prepare_socket_volume "$volume"
-  docker run -d --user "$host_user" --name "$sidecar" -e GNUPGHOME=/credential/gnupg \
+  docker run -d --name "$sidecar" -e GNUPGHOME=/credential/gnupg \
+    -e "AICAGE_UID=${host_user%%:*}" -e "AICAGE_GID=${host_user##*:}" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --mount "type=bind,src=$credential_dir,dst=/credential/gnupg,readonly" \
     "$image_ref" gpg serve >/dev/null
@@ -129,7 +122,6 @@ start_ssh_sidecar() {
   local sidecar="$2"
   local credential_dir="$3"
   docker volume create "$volume" >/dev/null
-  prepare_socket_volume "$volume"
   run_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
 }
 
@@ -137,7 +129,8 @@ run_ssh_sidecar() {
   local volume="$1"
   local sidecar="$2"
   local credential_dir="$3"
-  docker run -d --user "$host_user" --name "$sidecar" \
+  docker run -d --name "$sidecar" \
+    -e "AICAGE_UID=${host_user%%:*}" -e "AICAGE_GID=${host_user##*:}" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --mount "type=bind,src=$credential_dir,dst=/credential/ssh,readonly" \
     "$image_ref" ssh serve >/dev/null

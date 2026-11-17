@@ -10,9 +10,10 @@ RUN apk add --no-cache \
     gnupg \
     openssh-client \
     pinentry \
-    socat
+    socat \
+    su-exec
 
 # Credential-agent commands and private protocol implementations.
 COPY images/credential-agent/usr-local/ /usr/local/
 
-ENTRYPOINT ["credential-agent"]
+ENTRYPOINT ["credential-agent-entrypoint"]
