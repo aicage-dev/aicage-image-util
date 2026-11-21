@@ -11,6 +11,7 @@ RUN apk add --no-cache \
     openssh-client \
     pinentry \
     socat \
+    sqlite \
     su-exec
 
 # Credential-agent commands and private protocol implementations.
