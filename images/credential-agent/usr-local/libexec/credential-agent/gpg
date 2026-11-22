@@ -77,13 +77,25 @@ case "${1:-}" in
     gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
       --list-secret-keys | awk -F: '$1 == "grp" {print $10}'
     ;;
+  fingerprints)
+    gpg --batch --with-colons --with-keygrip --homedir "$agent_home" \
+      --list-secret-keys | awk -F: '
+      $1 == "sec" { pending = $2 != "d" && $2 != "e" && $2 != "i" && $2 != "r"; next }
+      $1 == "fpr" && pending { print $10; pending = 0; next }
+      $1 == "ssb" { pending = 0 }
+    '
+    ;;
+  source-keygrips)
+    find "$credential_home/private-keys-v1.d" -maxdepth 1 -type f -name '*.key' \
+      -exec sh -c 'basename "$1" .key' _ {} \; 2>/dev/null || true
+    ;;
   reset)
     gpgconf --homedir "$agent_home" --kill gpg-agent || true
     rm -rf "${agent_home:?}"
     initialize_agent_home
     ;;
   *)
-    echo "Usage: credential-agent gpg {keygrips|load|load-interactive|ready|reset|serve|usable}" >&2
+    echo "Usage: credential-agent gpg {fingerprints|keygrips|load|load-interactive|ready|reset|serve|source-keygrips|usable}" >&2
     exit 64
     ;;
 esac

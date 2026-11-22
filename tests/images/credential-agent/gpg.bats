@@ -68,6 +68,23 @@ gpg_socket="$socket_directory/S.gpg-agent"
   [ "$output" = unusable ]
 }
 
+@test "GnuPG metadata reports active and mounted secret keys" {
+  local volume sidecar credential_dir fingerprint
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+
+  create_protected_gpg_fixture "$credential_dir" fingerprint
+  start_gpg_sidecar "$volume" "$sidecar" "$credential_dir"
+
+  run docker exec --user "$host_user" "$sidecar" credential-agent gpg fingerprints
+  [ "$status" -eq 0 ]
+  [ "$output" = "$fingerprint" ]
+  run docker exec --user "$host_user" "$sidecar" credential-agent gpg source-keygrips
+  [ "$status" -eq 0 ]
+  [ -n "$output" ]
+}
+
 @test "GnuPG reports a cached protected secret key as usable" {
   local volume sidecar credential_dir fingerprint
   new_volume_name volume

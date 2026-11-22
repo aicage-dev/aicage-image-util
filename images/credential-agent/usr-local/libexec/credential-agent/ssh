@@ -22,6 +22,22 @@ case "${1:-}" in
       [ "$?" -eq 1 ]
     fi
     ;;
+  fingerprint)
+    key_path="${2:?Usage: credential-agent ssh fingerprint KEY_PATH}"
+    ssh-keygen -lf "$key_path" -E sha256 | awk 'NR == 1 {print $2}'
+    ;;
+  identity-fingerprint)
+    identity="${2:?Usage: credential-agent ssh identity-fingerprint PUBLIC_KEY}"
+    printf '%s\n' "$identity" | ssh-keygen -lf - -E sha256 | awk 'NR == 1 {print $2}'
+    ;;
+  encrypted)
+    key_path="${2:?Usage: credential-agent ssh encrypted KEY_PATH}"
+    if ssh-keygen -y -P '' -f "$key_path" >/dev/null 2>&1; then
+      printf '%s\n' unencrypted
+    else
+      printf '%s\n' encrypted
+    fi
+    ;;
   load)
     key_path="${2:?Usage: credential-agent ssh load KEY_PATH}"
     key_copy="${3:?Usage: credential-agent ssh load KEY_PATH COPY_PATH}"
@@ -57,7 +73,7 @@ case "${1:-}" in
     SSH_AUTH_SOCK="$socket" ssh-add -d "$key_copy"
     ;;
   *)
-    echo "Usage: credential-agent ssh {list|load KEY_PATH|load-interactive KEY_PATH|remove|ready|serve}" >&2
+    echo "Usage: credential-agent ssh {encrypted|fingerprint|identity-fingerprint|list|load KEY_PATH|load-interactive KEY_PATH|remove|ready|serve}" >&2
     exit 64
     ;;
 esac
