@@ -1,4 +1,5 @@
 FORMATTERS_DISABLE_ERRORS: false
+LINTER_RULES_PATH: .github/linters
 
 # flake8
 PYTHON_FLAKE8_ARGUMENTS: "--max-line-length 120"
