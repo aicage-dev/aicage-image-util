@@ -60,6 +60,28 @@ credential_copy_path() {
   [ "$output" = unencrypted ]
 }
 
+@test "SSH metadata commands support the numeric sidecar user" {
+  local volume sidecar credential_dir fingerprint identity
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  fingerprint="$(ssh-keygen -lf "$credential_dir/id_ed25519" -E sha256 | awk '{print $2}')"
+  identity="$(cat "$credential_dir/id_ed25519.pub")"
+
+  run docker exec --user "$host_user" "$sidecar" credential-agent ssh fingerprint /credential/ssh/id_ed25519
+  [ "$status" -eq 0 ]
+  [ "$output" = "$fingerprint" ]
+  run docker exec --user "$host_user" "$sidecar" credential-agent ssh identity-fingerprint "$identity"
+  [ "$status" -eq 0 ]
+  [ "$output" = "$fingerprint" ]
+  run docker exec --user "$host_user" "$sidecar" credential-agent ssh encrypted /credential/ssh/id_ed25519
+  [ "$status" -eq 0 ]
+  [ "$output" = unencrypted ]
+}
+
 @test "encrypted SSH key loads and authenticates" {
   local volume sidecar credential_dir public_dir message_dir sshd
   new_volume_name volume
