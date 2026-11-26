@@ -134,6 +134,24 @@ credential_copy_path() {
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
+@test "SSH load includes a matching user certificate" {
+  local volume sidecar credential_dir
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/ca"
+  ssh-keygen -q -s "$credential_dir/ca" -I aicage-test -n root "$credential_dir/id_ed25519.pub"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" credential-agent ssh load /credential/ssh/id_ed25519 \
+    "$(credential_copy_path /credential/ssh/id_ed25519)"
+  docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
+    --mount "type=volume,src=$volume,dst=$socket_directory" \
+    --entrypoint ssh-add "$image_ref" -L | grep -q 'ssh-ed25519-cert-v01@openssh.com'
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
 @test "interactive SSH load handles an unencrypted key" {
   local volume sidecar credential_dir
   new_volume_name volume
@@ -146,6 +164,24 @@ credential_copy_path() {
   docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
     --mount "type=volume,src=$volume,dst=$socket_directory" \
     --entrypoint ssh-add "$image_ref" -l | grep -q ED25519
+  assert_socket_volume_contains_only_sockets "$volume"
+}
+
+@test "interactive SSH load includes a matching user certificate" {
+  local volume sidecar credential_dir
+  new_volume_name volume
+  new_sidecar_name sidecar
+  new_test_directory credential_dir
+
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/id_ed25519"
+  ssh-keygen -q -t ed25519 -N '' -f "$credential_dir/ca"
+  ssh-keygen -q -s "$credential_dir/ca" -I aicage-test -n root "$credential_dir/id_ed25519.pub"
+  start_ssh_sidecar "$volume" "$sidecar" "$credential_dir"
+  docker exec "$sidecar" credential-agent ssh load-interactive /credential/ssh/id_ed25519 \
+    "$(credential_copy_path /credential/ssh/id_ed25519)"
+  docker run --rm -e "SSH_AUTH_SOCK=$ssh_socket" \
+    --mount "type=volume,src=$volume,dst=$socket_directory" \
+    --entrypoint ssh-add "$image_ref" -L | grep -q 'ssh-ed25519-cert-v01@openssh.com'
   assert_socket_volume_contains_only_sockets "$volume"
 }
 
