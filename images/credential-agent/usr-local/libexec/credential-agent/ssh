@@ -44,9 +44,13 @@ case "${1:-}" in
     umask 077
     mkdir -p "$(dirname "$key_copy")"
     chmod 700 "$(dirname "$key_copy")"
-    trap 'rm -f "$key_copy"' EXIT HUP INT TERM
+    certificate_copy="${key_copy}-cert.pub"
+    trap 'rm -f "$key_copy" "$certificate_copy"' EXIT HUP INT TERM
     cp "$key_path" "$key_copy"
     chmod 600 "$key_copy"
+    if [ -f "${key_path}-cert.pub" ]; then
+      cp "${key_path}-cert.pub" "$certificate_copy"
+    fi
     SSH_AUTH_SOCK="$socket" \
       SSH_ASKPASS=/usr/local/libexec/credential-agent/ssh-askpass \
       SSH_ASKPASS_REQUIRE=force \
@@ -59,9 +63,13 @@ case "${1:-}" in
     umask 077
     mkdir -p "$(dirname "$key_copy")"
     chmod 700 "$(dirname "$key_copy")"
-    trap 'rm -f "$key_copy"' EXIT HUP INT TERM
+    certificate_copy="${key_copy}-cert.pub"
+    trap 'rm -f "$key_copy" "$certificate_copy"' EXIT HUP INT TERM
     cp "$key_path" "$key_copy"
     chmod 600 "$key_copy"
+    if [ -f "${key_path}-cert.pub" ]; then
+      cp "${key_path}-cert.pub" "$certificate_copy"
+    fi
     SSH_AUTH_SOCK="$socket" ssh-add "$key_copy"
     ;;
   remove)
